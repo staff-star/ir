@@ -70,14 +70,19 @@ function runPhase1Tests() {
   assertEquals_('sample-product', rakutenRecord.itemsubRow['メインデータの商品コード（楽天URL）'], '楽天 先頭1列');
   assertEquals_('共通商品名', rakutenRecord.itemsubRow['メインデータの商品名'], '楽天 先頭2列');
   assertEquals_('美味セレクト楽天市場店', rakutenRecord.itemsubRow['ショップ名'], '楽天 先頭3列');
-  assertEquals_('100227', rakutenRecord.itemsubRow['楽天ジャンルID'], '楽天 genre');
+  assertEquals_('', rakutenRecord.itemsubRow['表示先カテゴリ'], '楽天 表示先カテゴリは空欄');
+  assertEquals_('', rakutenRecord.itemsubRow['楽天ジャンルID'], '楽天 genre は空欄');
   assertEquals_('1480', rakutenRecord.itemsubRow['通常購入販売価格'], '楽天 通常価格');
   assertEquals_('1280', rakutenRecord.itemsubRow['表示価格'], '楽天 表示価格');
   assertEquals_('1', rakutenRecord.itemsubRow['二重価格文言'], '楽天 二重価格文言');
+  assertEquals_('', rakutenRecord.itemsubRow['カタログID'], '楽天 カタログIDは空欄');
   assertEquals_('1', rakutenRecord.itemsubRow['送料'], '楽天 送料導出');
+  assertEquals_('', rakutenRecord.itemsubRow['商品画像1'], '楽天 画像1は空欄');
   assertEquals_('', rakutenRecord.itemsubRow['商品属性（項目）1'], '楽天 属性1 項目は空欄');
   assertEquals_('', rakutenRecord.itemsubRow['商品属性（値）1'], '楽天 属性1 値は空欄');
   assertEquals_('', rakutenRecord.itemsubRow['商品属性（単位）1'], '楽天 属性1 単位は空欄');
+  assertEquals_('リードタイム（１日）', rakutenRecord.itemsubRow['在庫あり時出荷リードタイム'], '楽天 在庫あり時出荷リードタイム');
+  assertEquals_('1', rakutenRecord.itemsubRow['在庫あり時納期管理番号'], '楽天 在庫あり時納期管理番号');
   assertEquals_('0', rakutenRecord.itemsubRow['PC用商品説明文改行'], '楽天 改行0');
   assertEquals_('1', rakutenRecord.itemsubRow['サーチ表示'], '楽天 サーチ表示');
   assertEquals_(0, rakutenRecord.errors.length, '楽天 record errors');
@@ -101,6 +106,8 @@ function runPhase1Tests() {
   }, 4);
   assertEquals_('1980', rakutenFallbackRecord.itemsubRow['表示価格'], '楽天 表示価格 fallback');
   assertEquals_('', rakutenFallbackRecord.itemsubRow['商品属性（項目）1'], '楽天 属性は未入力');
+  assertEquals_('リードタイム（１日）', rakutenFallbackRecord.itemsubRow['在庫あり時出荷リードタイム'], '楽天 固定リードタイム');
+  assertEquals_('1', rakutenFallbackRecord.itemsubRow['在庫あり時納期管理番号'], '楽天 固定納期番号');
 
   const yahooRecord = buildYahooItemsubRecord_({
       product_code: 'sample-product',

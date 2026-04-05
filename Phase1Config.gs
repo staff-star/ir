@@ -23,6 +23,8 @@ const PHASE1_CONFIG = Object.freeze({
         stockReturnFlag: '0',
         stockLeadTime: '',
         outOfStockLeadTime: '',
+        shippingLeadTimeLabel: 'リードタイム（１日）',
+        availableLeadTimeCode: '1',
         deliveryLeadTime: '自社出荷/RSL',
         stockManagementId: '',
         searchVisibleFlag: '1',

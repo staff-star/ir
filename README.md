@@ -50,14 +50,20 @@
 30. `publish_yahoo`
 
 ## 楽天 itemsub の回収点
-- `楽天ジャンルID` を出力します
+- `表示先カテゴリ` は itemsub では空欄で出力します
+- `楽天ジャンルID` は itemsub では空欄で出力します
+- `カタログID` は itemsub では空欄で出力します
+- `商品画像1〜20` は itemsub では空欄で出力します
 - `rakuten_display_price` を `表示価格` に出力します
   - 空欄なら `sale_price` を使います
 - `rakuten_double_price_text_mode` を `二重価格文言` に出力します
   - 許可値は `0 / 1 / 2 / 空欄`
+- `在庫あり時出荷リードタイム` は `リードタイム（１日）` 固定です
+- `在庫あり時納期管理番号` は `1` 固定です
 - 商品属性の列見出しは CSV に残します
   - いったん値は入れず、空欄のまま出力します
 - `attribute_template_key` は今は未使用です
+- `rakuten_delivery_lead_time` は中間入力から削除済みです
 
 ## CSV 出力時の吸収ルール
 - 楽天の `送料` は `rakuten_delivery_set_id` から導出します

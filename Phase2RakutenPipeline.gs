@@ -75,8 +75,8 @@ function buildRakutenItemsubRecord_(source, sourceRowNumber) {
     errors
   );
   normalized.stockReturnFlag = defaults.stockReturnFlag;
-  normalized.stockLeadTime = defaults.stockLeadTime;
-  normalized.availableLeadTimeNumber = '';
+  normalized.stockLeadTime = defaults.shippingLeadTimeLabel;
+  normalized.availableLeadTimeNumber = defaults.availableLeadTimeCode;
   normalized.outOfStockLeadTime = defaults.outOfStockLeadTime;
   normalized.deliverySetId = normalizeDigitsField_(source.rakuten_delivery_set_id, 'rakuten_delivery_set_id', '楽天の配送方法セット番号', errors, { required: false, maxDigits: 5 });
   normalized.deliveryLeadTime = defaults.deliveryLeadTime;
@@ -95,8 +95,9 @@ function buildRakutenItemsubRecord_(source, sourceRowNumber) {
   itemsubRow['メインデータの商品名'] = normalized.mainTitle;
   itemsubRow['ショップ名'] = normalized.shopName;
   itemsubRow['商品コード（楽天URL）'] = normalized.productCode;
-  itemsubRow['表示先カテゴリ'] = normalized.category;
-  itemsubRow['楽天ジャンルID'] = normalized.rakutenGenreId;
+  itemsubRow['表示先カテゴリ'] = '';
+  // 楽天ジャンルIDは ir-item 側で管理するため itemsub では出さない。
+  itemsubRow['楽天ジャンルID'] = '';
   itemsubRow['商品名'] = normalized.title;
   itemsubRow['PC用キャッチコピー'] = normalized.catchcopy;
   itemsubRow['消費税'] = normalized.tax.taxFlag;
@@ -107,7 +108,7 @@ function buildRakutenItemsubRecord_(source, sourceRowNumber) {
   itemsubRow['PC用販売説明文改行'] = '0';
   itemsubRow['スマートフォン用商品説明文'] = normalized.spDescription;
   itemsubRow['スマートフォン用商品説明文改行'] = '0';
-  itemsubRow['カタログID'] = normalized.janCode;
+  itemsubRow['カタログID'] = '';
   itemsubRow['倉庫指定'] = PHASE1_CONFIG.defaultWarehouseFlag;
   itemsubRow['送料'] = normalized.shippingCode;
   itemsubRow['アップロード対象設定'] = normalized.uploadTargetFlag;
@@ -128,10 +129,6 @@ function buildRakutenItemsubRecord_(source, sourceRowNumber) {
   itemsubRow['表示項目の並び順'] = normalized.displayOrder;
   itemsubRow['共通説明文（小）'] = normalized.commonDescSmall;
   itemsubRow['共通説明文（大）'] = normalized.commonDescLarge;
-
-  normalized.imageBundle.urls.forEach(function (url, index) {
-    itemsubRow[`商品画像${index + 1}`] = url;
-  });
 
   normalized.attributeBundle.items.forEach(function (item, index) {
     itemsubRow[`商品属性（項目）${index + 1}`] = item.name;
@@ -157,9 +154,9 @@ function buildRakutenReviewRow_(record) {
     record.normalized.mainProductCode || '',
     record.normalized.mainTitle || '',
     record.normalized.shopName || '',
-    record.normalized.category || '',
+    itemsubValue_(record, '表示先カテゴリ'),
     record.source.rakuten_genre_id || '',
-    record.normalized.rakutenGenreId || '',
+    itemsubValue_(record, '楽天ジャンルID'),
     record.normalized.salePrice || '',
     record.source.rakuten_display_price || '',
     record.normalized.displayPrice || '',
