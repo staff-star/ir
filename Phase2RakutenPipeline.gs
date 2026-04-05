@@ -1,5 +1,3 @@
-let RAKUTEN_ATTRIBUTE_TEMPLATE_CACHE_ = null;
-
 function refreshRakutenConfirmationSheet() {
   const result = buildRakutenPhase2Result_();
   initializeSheet_(getActiveSpreadsheet_(), PHASE1_CONFIG.sheetNames.rakutenReview, result.reviewRows, 1);
@@ -31,8 +29,6 @@ function exportRakutenItemsubCsv() {
 }
 
 function buildRakutenPhase2Result_() {
-  RAKUTEN_ATTRIBUTE_TEMPLATE_CACHE_ = null;
-
   const sourceRows = readInputRows_();
   const records = sourceRows.map(function (sourceRow, index) {
     return buildRakutenItemsubRecord_(sourceRow, index + 3);
@@ -92,15 +88,7 @@ function buildRakutenItemsubRecord_(source, sourceRowNumber) {
   normalized.commonDescSmall = defaults.commonDescSmall;
   normalized.commonDescLarge = defaults.commonDescLarge;
   normalized.shippingCode = deriveRakutenShippingCodeFromDeliverySet_(normalized.deliverySetId);
-  normalized.attributeBundle = buildRakutenAttributeBundle_(normalized.attributeTemplateKey, errors);
-
-  if (normalized.publishFlag === '1' && normalized.rakutenGenreId && normalized.attributeBundle.count === 0) {
-    errors.push(buildError_(
-      'attribute_template_key',
-      'RAKUTEN_GENRE_REQUIRES_ATTRIBUTES',
-      '楽天ジャンルIDを出す行は、attribute_template_key に対応する楽天商品属性テンプレートが1件以上必要です。'
-    ));
-  }
+  normalized.attributeBundle = buildRakutenAttributeBundle_();
 
   const itemsubRow = createEmptyRowFromHeader_(RAKUTEN_ITEMSUB_HEADER);
   itemsubRow['メインデータの商品コード（楽天URL）'] = normalized.mainProductCode;
@@ -235,92 +223,11 @@ function normalizeRakutenDoublePriceTextMode_(value, defaultValue, errors) {
   );
 }
 
-function loadRakutenAttributeTemplateRows_(attributeTemplateKey) {
-  const key = trimToString_(attributeTemplateKey);
-  if (!key) {
-    return [];
-  }
-
-  if (!RAKUTEN_ATTRIBUTE_TEMPLATE_CACHE_) {
-    RAKUTEN_ATTRIBUTE_TEMPLATE_CACHE_ = readRakutenAttributeTemplateSheet_();
-  }
-
-  return RAKUTEN_ATTRIBUTE_TEMPLATE_CACHE_[key] || [];
-}
-
-function readRakutenAttributeTemplateSheet_() {
-  const sheet = getOrCreateSheet_(PHASE1_CONFIG.sheetNames.rakutenAttributeTemplate);
-  const lastRow = sheet.getLastRow();
-  const cache = {};
-
-  if (lastRow < 2) {
-    return cache;
-  }
-
-  const values = sheet.getRange(2, 1, lastRow - 1, RAKUTEN_ATTRIBUTE_TEMPLATE_HEADER.length).getDisplayValues();
-  values.forEach(function (row, index) {
-    const key = trimToString_(row[0]);
-    if (!key) {
-      return;
-    }
-
-    if (!cache[key]) {
-      cache[key] = [];
-    }
-
-    cache[key].push({
-      sourceRowNumber: index + 2,
-      sortNo: trimToString_(row[1]),
-      name: trimToString_(row[2]),
-      value: trimToString_(row[3]),
-      unit: trimToString_(row[4])
-    });
-  });
-
-  Object.keys(cache).forEach(function (key) {
-    cache[key].sort(function (left, right) {
-      return normalizeSortNoForAttributeTemplate_(left.sortNo) - normalizeSortNoForAttributeTemplate_(right.sortNo);
-    });
-  });
-
-  return cache;
-}
-
-function buildRakutenAttributeBundle_(attributeTemplateKey, errors) {
-  const items = [];
-  const rows = loadRakutenAttributeTemplateRows_(attributeTemplateKey).slice().sort(function (left, right) {
-    return normalizeSortNoForAttributeTemplate_(left.sortNo) - normalizeSortNoForAttributeTemplate_(right.sortNo);
-  });
-
-  rows.slice(0, 20).forEach(function (row) {
-    if (!row.name || !row.value || !row.unit) {
-      errors.push(buildError_(
-        'attribute_template_key',
-        'ATTRIBUTE_TEMPLATE_INCOMPLETE',
-        `楽天商品属性テンプレートの ${row.sourceRowNumber} 行目は、項目・値・単位をすべて入力してください。`
-      ));
-      return;
-    }
-
-    items.push({
-      name: row.name,
-      value: row.value,
-      unit: row.unit
-    });
-  });
-
+function buildRakutenAttributeBundle_() {
   return {
-    count: items.length,
-    items: items
+    count: 0,
+    items: []
   };
-}
-
-function normalizeSortNoForAttributeTemplate_(value) {
-  const text = trimToString_(value);
-  if (!text || !/^\d+$/.test(text)) {
-    return Number.MAX_SAFE_INTEGER;
-  }
-  return Number(text);
 }
 
 function itemsubValue_(record, key) {

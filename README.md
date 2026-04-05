@@ -4,7 +4,6 @@
 
 ## 今回の仕様
 - 入力シートは `中間入力` のみ
-- 楽天用の属性マスタとして `楽天商品属性テンプレート` シートを使います
 - 確認用は 3 系統
   - `確認用`
   - `楽天確認用`
@@ -50,25 +49,15 @@
 29. `publish_rakuten`
 30. `publish_yahoo`
 
-## 楽天商品属性テンプレート
-シート名は `楽天商品属性テンプレート` です。列は次の 5 つです。
-
-1. `attribute_template_key`
-2. `sort_no`
-3. `rakuten_attr_name`
-4. `rakuten_attr_value`
-5. `rakuten_attr_unit`
-
-`中間入力.attribute_template_key` と一致する行を読み、`sort_no` 順に楽天 itemsub へ展開します。MVP では 20 セットまで出力します。
-
 ## 楽天 itemsub の回収点
 - `楽天ジャンルID` を出力します
 - `rakuten_display_price` を `表示価格` に出力します
   - 空欄なら `sale_price` を使います
 - `rakuten_double_price_text_mode` を `二重価格文言` に出力します
   - 許可値は `0 / 1 / 2 / 空欄`
-- `attribute_template_key` から `商品属性（項目 / 値 / 単位）1..20` を出力します
-- `publish_rakuten = 1` かつ `rakuten_genre_id` がある行は、属性テンプレートから 1 件以上の属性が必要です
+- 商品属性の列見出しは CSV に残します
+  - いったん値は入れず、空欄のまま出力します
+- `attribute_template_key` は今は未使用です
 
 ## CSV 出力時の吸収ルール
 - 楽天の `送料` は `rakuten_delivery_set_id` から導出します
@@ -85,13 +74,12 @@
 ## 使い方
 1. `Phase1 > シートを初期化`
 2. `入力見本` と `使い方` を見ながら `中間入力` に入力
-3. 楽天ジャンルIDを使う商品がある場合は `楽天商品属性テンプレート` に属性セットを入れる
-4. 必要に応じて次を更新
+3. 必要に応じて次を更新
    - `Phase1の確認用を更新`
    - `楽天確認用を更新`
    - `Yahoo確認用を更新`
-5. エラー一覧を見て `中間入力` または `楽天商品属性テンプレート` を修正
-6. 必要な CSV だけ書き出す
+4. エラー一覧を見て `中間入力` を修正
+5. 必要な CSV だけ書き出す
 
 ## 実装ファイル
 - `Phase1Config.gs`

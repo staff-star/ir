@@ -30,7 +30,6 @@ function initializePhase1Workbook() {
 
 function initializePhase2Sheets() {
   const ss = getActiveSpreadsheet_();
-  ensureRakutenAttributeTemplateSheet_();
   initializeSheet_(ss, PHASE1_CONFIG.sheetNames.rakutenReview, [RAKUTEN_REVIEW_SCHEMA], 1);
   initializeSheet_(ss, PHASE1_CONFIG.sheetNames.rakutenErrors, [RAKUTEN_ERROR_SCHEMA], 1);
   initializeSheet_(ss, PHASE1_CONFIG.sheetNames.yahooReview, [YAHOO_REVIEW_SCHEMA], 1);
@@ -38,7 +37,6 @@ function initializePhase2Sheets() {
 }
 
 function refreshGuideSheet() {
-  ensureRakutenAttributeTemplateSheet_();
   writeSampleSheet_();
   writeGuideSheet_();
 }
@@ -271,22 +269,6 @@ function writeSampleSheet_() {
   applySampleSheetFormat_(getOrCreateSheet_(PHASE1_CONFIG.sheetNames.sample, ss), rows.length, rows[4].length);
 }
 
-function ensureRakutenAttributeTemplateSheet_() {
-  const ss = getActiveSpreadsheet_();
-  const sheet = getOrCreateSheet_(PHASE1_CONFIG.sheetNames.rakutenAttributeTemplate, ss);
-  const headerRow = [RAKUTEN_ATTRIBUTE_TEMPLATE_HEADER];
-
-  if (sheet.getLastRow() === 0) {
-    initializeSheet_(ss, PHASE1_CONFIG.sheetNames.rakutenAttributeTemplate, headerRow, 1);
-    return;
-  }
-
-  sheet.getRange(1, 1, 1, RAKUTEN_ATTRIBUTE_TEMPLATE_HEADER.length).setValues(headerRow);
-  sheet.getRange(1, 1, 1, RAKUTEN_ATTRIBUTE_TEMPLATE_HEADER.length).setFontWeight('bold').setWrap(true).setVerticalAlignment('top').setBackground('#fce5cd');
-  sheet.setFrozenRows(1);
-  sheet.autoResizeColumns(1, RAKUTEN_ATTRIBUTE_TEMPLATE_HEADER.length);
-}
-
 function initializeSheet_(ss, sheetName, rows, frozenRows) {
   const sheet = getOrCreateSheet_(sheetName, ss);
   sheet.clearContents();
@@ -329,7 +311,7 @@ function buildSampleSheetRows_() {
   return [
     Object.assign(blankRow.slice(), { 0: '入力見本' }),
     Object.assign(blankRow.slice(), { 0: 'このシートの使い方', 1: '5行目が見出し、6行目が説明、7行目以降が実際の入力例です。実務では「中間入力」シートの3行目から入力します。' }),
-    Object.assign(blankRow.slice(), { 0: '見方のコツ', 1: '青い欄はAIや元データをまとめて貼る欄、黄色い欄は人が確認する欄です。人が入れる欄は少なくしてあり、最後の3列で Phase1 / 楽天 / Yahoo の出力先を切り分けます。楽天ジャンルIDを使う行は、別シート「楽天商品属性テンプレート」もセットで使います。' }),
+    Object.assign(blankRow.slice(), { 0: '見方のコツ', 1: '青い欄はAIや元データをまとめて貼る欄、黄色い欄は人が確認する欄です。人が入れる欄は少なくしてあり、最後の3列で Phase1 / 楽天 / Yahoo の出力先を切り分けます。商品属性の欄は CSV 側に見出しだけ用意し、今は空欄で出します。' }),
     blankRow.slice(),
     sampleHeader,
     sampleNotes,
@@ -359,7 +341,7 @@ function buildSampleSheetRows_() {
       rakuten_display_price: '1480',
       rakuten_double_price_text_mode: '1',
       yahoo_shipping_group_id: '2',
-      attribute_template_key: 'default',
+      attribute_template_key: '',
       note: '初回出品分',
       publish_phase1: '1',
       publish_rakuten: '1',
@@ -384,7 +366,7 @@ function buildSampleSheetRows_() {
       yahoo_sp_free: 'スマホ向けの補足だけを入れます。',
       rakuten_display_price: '',
       rakuten_double_price_text_mode: '',
-      attribute_template_key: 'default',
+      attribute_template_key: '',
       note: 'Yahooは後日開始',
       publish_phase1: '1',
       publish_rakuten: '1',
@@ -426,7 +408,7 @@ function populateGuideSheet_(sheet) {
   setMergedValue_(
     sheet,
     'A3:J4',
-    '入力は「中間入力」1枚でまとめて行い、その後に Phase1、楽天、Yahoo の確認用シートへ分かれます。人が入れる欄は必要最小限にし、出したい先だけ最後の3列を 1 にして、必要なCSVだけ作成します。楽天ジャンルIDを使う商品は「楽天商品属性テンプレート」も合わせて設定します。'
+    '入力は「中間入力」1枚でまとめて行い、その後に Phase1、楽天、Yahoo の確認用シートへ分かれます。人が入れる欄は必要最小限にし、出したい先だけ最後の3列を 1 にして、必要なCSVだけ作成します。商品属性の欄は今は入力せず、CSV に見出しだけ残します。'
   );
 
   setMergedValue_(sheet, 'A6:C8', '1. データ入力\n共通の中間入力へ入れる');
@@ -439,7 +421,7 @@ function populateGuideSheet_(sheet) {
   setMergedValue_(
     sheet,
     'A12:D27',
-    '青い欄はAIや元データを一気に貼る欄です。黄色い欄は人が確認して決める欄です。\n\n列のまとまりは次の4つです。\n・共通入力: 商品コード、共通商品名、価格、JAN、画像枚数など\n・楽天入力: 楽天用の商品名、説明文、販売説明文など\n・Yahoo入力: Yahoo用の商品名、説明文、スマホ自由欄など\n・確認と出力設定: 楽天の配送方法セット番号、楽天の表示価格、楽天の二重価格文言、Yahooの配送グループ番号、属性テンプレート名、publishフラグなど\n\n最後の3列は出力先のスイッチです。\n・publish_phase1 = ir-item.csv\n・publish_rakuten = ir-itemsub_楽天.csv\n・publish_yahoo = ir-itemsub_Yahoo.csv\n\n楽天の送料は「配送方法セット番号」から自動で決まります。楽天の表示価格を空欄にすると販売価格と同じ値を使います。楽天ジャンルIDを使う行は、別シート「楽天商品属性テンプレート」に属性セットを用意してください。YahooのパスやページIDはこの段階では入力しません。\n\n1行に1商品ずつ入れます。画像は白背景画像なしで、1 から image_count の枚数だけ自動生成します。'
+    '青い欄はAIや元データを一気に貼る欄です。黄色い欄は人が確認して決める欄です。\n\n列のまとまりは次の4つです。\n・共通入力: 商品コード、共通商品名、価格、JAN、画像枚数など\n・楽天入力: 楽天用の商品名、説明文、販売説明文など\n・Yahoo入力: Yahoo用の商品名、説明文、スマホ自由欄など\n・確認と出力設定: 楽天の配送方法セット番号、楽天の表示価格、楽天の二重価格文言、Yahooの配送グループ番号、属性テンプレート名、publishフラグなど\n\n最後の3列は出力先のスイッチです。\n・publish_phase1 = ir-item.csv\n・publish_rakuten = ir-itemsub_楽天.csv\n・publish_yahoo = ir-itemsub_Yahoo.csv\n\n楽天の送料は「配送方法セット番号」から自動で決まります。楽天の表示価格を空欄にすると販売価格と同じ値を使います。商品属性の列は CSV に見出しだけあり、今は内容を入れません。YahooのパスやページIDはこの段階では入力しません。\n\n1行に1商品ずつ入れます。画像は白背景画像なしで、1 から image_count の枚数だけ自動生成します。'
   );
   setMergedValue_(sheet, 'E12:J12', '画面イメージ: 入力見本');
   sheet.getRange('E13').setFormula("=ARRAY_CONSTRAIN('入力見本'!A5:F8,4,6)");
@@ -450,7 +432,7 @@ function populateGuideSheet_(sheet) {
   setMergedValue_(
     sheet,
     'A31:D48',
-    '入力後はメニューから確認用を更新します。\n\nPhase1の確認用では、共通データから ir-item.csv に入る内容を見ます。\n楽天確認用では、楽天専用の商品名、説明文、配送方法セット番号から決まる送料、楽天ジャンルID、表示価格、二重価格文言、属性件数などを見ます。\nYahoo確認用では、Yahoo専用の商品名、隠しページ設定、配送グループなどを見ます。\n\nエラーが出たら、直す場所は必ず「中間入力」または「楽天商品属性テンプレート」です。修正したあと、もう一度その確認用を更新してください。'
+    '入力後はメニューから確認用を更新します。\n\nPhase1の確認用では、共通データから ir-item.csv に入る内容を見ます。\n楽天確認用では、楽天専用の商品名、説明文、配送方法セット番号から決まる送料、楽天ジャンルID、表示価格、二重価格文言などを見ます。商品属性の欄は今は空欄のままです。\nYahoo確認用では、Yahoo専用の商品名、隠しページ設定、配送グループなどを見ます。\n\nエラーが出たら、直す場所は必ず「中間入力」です。修正したあと、もう一度その確認用を更新してください。'
   );
   setMergedValue_(sheet, 'E31:J31', '画面イメージ: 確認用');
   sheet.getRange('E32').setFormula("=ARRAY_CONSTRAIN('確認用'!A1:F4,4,6)");
@@ -488,7 +470,7 @@ function populateGuideSheet_(sheet) {
 
   setMergedValue_(sheet, 'A86:J86', '困ったとき');
   setMergedValue_(sheet, 'A87:C90', '楽天だけ止まる');
-  setMergedValue_(sheet, 'D87:J90', '「楽天エラー一覧」を見てください。配送方法セット番号、表示価格、二重価格文言、楽天商品属性テンプレートの不足など、楽天専用の欄で止まることがあります。');
+  setMergedValue_(sheet, 'D87:J90', '「楽天エラー一覧」を見てください。配送方法セット番号、表示価格、二重価格文言など、楽天専用の欄で止まることがあります。商品属性は今は未入力のままで構いません。');
   setMergedValue_(sheet, 'A91:C94', 'Yahooだけ止まる');
   setMergedValue_(sheet, 'D91:J94', '「Yahooエラー一覧」を見てください。パス、ページID、配送グループ番号、公開設定などを確認します。');
   setMergedValue_(sheet, 'A95:C98', '何も出ない');
@@ -863,9 +845,6 @@ function buildImageBundle_(productCode, imageCountValue, imageExtValue, errors) 
 }
 
 function validateAttributeDependency_(source, normalized, errors) {
-  if (trimToString_(source.attribute_template_key) && !normalized.rakutenGenreId) {
-    errors.push(buildError_('rakuten_genre_id', 'REQUIRED', '属性テンプレート名を使う場合は楽天ジャンルIDが必要です。'));
-  }
 }
 
 function downloadCsvFile_(fileName, rows, charset) {

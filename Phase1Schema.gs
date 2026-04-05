@@ -34,7 +34,7 @@ const PHASE1_INPUT_SCHEMA = Object.freeze([
   { key: 'rakuten_display_price', label: '楽天の表示価格', required: false, note: '楽天 itemsub の「表示価格」です。空欄なら sale_price と同じ値を使います。', example: '1480' },
   { key: 'rakuten_double_price_text_mode', label: '楽天の二重価格文言', required: false, note: '楽天 itemsub の「二重価格文言」です。0=表示しない、1=比較対照価格、2=メーカー希望小売価格、空欄=設定しません。', example: '1' },
   { key: 'yahoo_shipping_group_id', label: 'Yahooの配送グループ番号', required: false, note: '人が確認して入れる欄です。Yahooの配送グループ管理番号を入れます。', example: '2' },
-  { key: 'attribute_template_key', label: '属性テンプレート名', required: false, note: '「楽天商品属性テンプレート」シートとつなぐための名前です。楽天ジャンルIDを使う行では、この名前に合う属性セットを使います。', example: 'default' },
+  { key: 'attribute_template_key', label: '属性テンプレート名', required: false, note: '今は未使用です。将来使う可能性があるため列だけ残しています。空欄で構いません。', example: '' },
   { key: 'note', label: 'メモ', required: false, note: '社内メモです。CSVには出ません。', example: '初回出品分' },
   { key: 'publish_phase1', label: 'Phase1を出力するか', required: true, note: 'ir-item.csv に出したい行だけ 1 を入れます。', example: '1' },
   { key: 'publish_rakuten', label: '楽天itemsubを出力するか', required: true, note: '楽天用 ir-itemsub に出したい行だけ 1 を入れます。', example: '1' },
