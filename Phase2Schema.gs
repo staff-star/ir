@@ -8,7 +8,7 @@ const RAKUTEN_ATTRIBUTE_TEMPLATE_HEADER = Object.freeze([
 
 const RAKUTEN_REVIEW_SCHEMA = Object.freeze([
   '入力した行番号',
-  '楽天itemsubを出力するか',
+  '楽天CSVの対象',
   '楽天CSVに出るか',
   'メインデータの商品コード',
   'メインデータの商品名',
@@ -17,9 +17,9 @@ const RAKUTEN_REVIEW_SCHEMA = Object.freeze([
   '入力した楽天ジャンルID',
   'CSVに出る楽天ジャンルID',
   '通常購入販売価格',
-  '入力した表示価格',
+  '表示価格の元',
   'CSVに出る表示価格',
-  '入力した二重価格文言',
+  '二重価格文言の元',
   'CSVに出る二重価格文言',
   '配送方法セット番号',
   '送料',
@@ -51,13 +51,13 @@ const RAKUTEN_ERROR_SCHEMA = Object.freeze([
   'どの欄で止まったか',
   '止まる原因の記号',
   '直すときの説明',
-  '楽天itemsubを出力するか',
+  '出力対象',
   '商品コード'
 ]);
 
 const YAHOO_REVIEW_SCHEMA = Object.freeze([
   '入力した行番号',
-  'Yahoo itemsubを出力するか',
+  'YahooCSVの対象',
   'Yahoo CSVに出るか',
   'メインデータの商品コード',
   'メインデータの商品名',
@@ -85,7 +85,7 @@ const YAHOO_ERROR_SCHEMA = Object.freeze([
   'どの欄で止まったか',
   '止まる原因の記号',
   '直すときの説明',
-  'Yahoo itemsubを出力するか',
+  '出力対象',
   '商品コード'
 ]);
 

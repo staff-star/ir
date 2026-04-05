@@ -18,7 +18,7 @@ function exportYahooItemsubCsv() {
     });
 
   if (exportRows.length === 0) {
-    throw new Error('Yahoo itemsub の出力対象がありません。publish_yahoo と Yahooエラー一覧 を確認してください。');
+    throw new Error('YahooCSV の出力対象がありません。Yahooエラー一覧 を確認してください。');
   }
 
   downloadCsvFile_(
@@ -34,12 +34,12 @@ function buildYahooPhase2Result_() {
     return buildYahooItemsubRecord_(sourceRow, index + 3);
   });
 
-  appendDuplicateProductCodeErrorsByPublishFlag_(records);
+  appendDuplicateProductCodeErrors_(records);
 
   return {
     records: records,
     reviewRows: [YAHOO_REVIEW_SCHEMA].concat(records.map(buildYahooReviewRow_)),
-    errorRows: buildErrorRowsFromRecords_(records, YAHOO_ERROR_SCHEMA, 'publish_yahoo')
+    errorRows: buildErrorRowsFromRecords_(records, YAHOO_ERROR_SCHEMA)
   };
 }
 
@@ -48,7 +48,6 @@ function buildYahooItemsubRecord_(source, sourceRowNumber) {
   const normalized = {};
   const defaults = PHASE1_CONFIG.mallSettings.yahoo.defaults;
 
-  normalized.publishFlag = normalizePublishFlag_(source.publish_yahoo);
   normalized.mainProductCode = normalizeProductCode_(source.product_code, errors);
   normalized.mainTitle = resolveTitle_(source, errors);
   normalized.shopName = PHASE1_CONFIG.mallSettings.yahoo.shopName;
@@ -56,10 +55,10 @@ function buildYahooItemsubRecord_(source, sourceRowNumber) {
   normalized.path = normalizeOptionalYahooPath_(defaults.path, errors);
   normalized.yahooProductCategory = '';
   normalized.title = resolveMallTitle_(source.yahoo_title, source.title, 'yahoo_title', 'Yahooの商品名', errors);
-  normalized.catchcopy = trimToString_(source.yahoo_catchcopy) || trimToString_(source.ai_catchcopy);
+  normalized.catchcopy = trimToString_(source.yahoo_catchcopy);
   normalized.salePrice = '';
   normalized.productInfo = '';
-  normalized.description = trimToString_(source.yahoo_desc) || trimToString_(source.ai_description_material);
+  normalized.description = trimToString_(source.yahoo_desc);
   normalized.spFree = trimToString_(source.yahoo_sp_free);
   normalized.janCode = '';
   normalized.uploadTargetFlag = normalizeChoiceField_(defaults.uploadTargetFlag, 'yahoo_upload_target_flag', 'Yahooのアップロード対象', errors, ['0', '1'], { defaultValue: '' });
@@ -109,14 +108,14 @@ function buildYahooItemsubRecord_(source, sourceRowNumber) {
     normalized: normalized,
     itemsubRow: itemsubRow,
     errors: errors,
-    shouldExport: normalized.publishFlag === '1' && errors.length === 0
+    shouldExport: errors.length === 0
   };
 }
 
 function buildYahooReviewRow_(record) {
   return [
     record.sourceRowNumber,
-    record.source.publish_yahoo || '',
+    '',
     record.shouldExport ? '1' : '0',
     record.normalized.mainProductCode || '',
     record.normalized.mainTitle || '',

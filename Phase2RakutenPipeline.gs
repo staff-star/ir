@@ -18,7 +18,7 @@ function exportRakutenItemsubCsv() {
     });
 
   if (exportRows.length === 0) {
-    throw new Error('楽天 itemsub の出力対象がありません。publish_rakuten と 楽天エラー一覧 を確認してください。');
+    throw new Error('楽天CSV の出力対象がありません。楽天エラー一覧 を確認してください。');
   }
 
   downloadCsvFile_(
@@ -34,12 +34,12 @@ function buildRakutenPhase2Result_() {
     return buildRakutenItemsubRecord_(sourceRow, index + 3);
   });
 
-  appendDuplicateProductCodeErrorsByPublishFlag_(records);
+  appendDuplicateProductCodeErrors_(records);
 
   return {
     records: records,
     reviewRows: [RAKUTEN_REVIEW_SCHEMA].concat(records.map(buildRakutenReviewRow_)),
-    errorRows: buildErrorRowsFromRecords_(records, RAKUTEN_ERROR_SCHEMA, 'publish_rakuten')
+    errorRows: buildErrorRowsFromRecords_(records, RAKUTEN_ERROR_SCHEMA)
   };
 }
 
@@ -48,7 +48,6 @@ function buildRakutenItemsubRecord_(source, sourceRowNumber) {
   const normalized = {};
   const defaults = PHASE1_CONFIG.mallSettings.rakuten.defaults;
 
-  normalized.publishFlag = normalizePublishFlag_(source.publish_rakuten);
   normalized.mainProductCode = normalizeProductCode_(source.product_code, errors);
   normalized.mainTitle = resolveTitle_(source, errors);
   normalized.shopName = PHASE1_CONFIG.mallSettings.rakuten.shopName;
@@ -56,22 +55,22 @@ function buildRakutenItemsubRecord_(source, sourceRowNumber) {
   normalized.category = normalizeCategoryLike_(source.category, 'category', '共通カテゴリ', true, errors);
   normalized.rakutenGenreId = normalizeRakutenGenreId_(source.rakuten_genre_id, errors);
   normalized.title = resolveMallTitle_(source.rakuten_title, source.title, 'rakuten_title', '楽天の商品名', errors);
-  normalized.catchcopy = trimToString_(source.rakuten_catchcopy) || trimToString_(source.ai_catchcopy);
+  normalized.catchcopy = trimToString_(source.rakuten_catchcopy);
   normalized.tax = resolveTaxRule_(source.food_flag, errors);
   normalized.salePrice = resolveSalePrice_(source.sale_price, errors);
-  normalized.pcDescription = trimToString_(source.rakuten_pc_desc) || trimToString_(source.ai_description_material);
+  normalized.pcDescription = trimToString_(source.rakuten_pc_desc);
   normalized.salesDescription = trimToString_(source.rakuten_sales_desc);
-  normalized.spDescription = trimToString_(source.rakuten_sp_desc) || trimToString_(source.ai_description_material);
+  normalized.spDescription = trimToString_(source.rakuten_sp_desc);
   normalized.janCode = normalizeJanCode_(source.jan_code, errors);
   normalized.imageBundle = buildImageBundle_(normalized.productCode, source.image_count, source.image_ext, errors);
   normalized.attributeTemplateKey = trimToString_(source.attribute_template_key);
   normalized.uploadTargetFlag = defaults.uploadTargetFlag;
   normalized.saleStart = defaults.saleStart;
   normalized.saleEnd = defaults.saleEnd;
-  normalized.displayPrice = resolveRakutenDisplayPrice_(source.rakuten_display_price, normalized.salePrice, errors);
+  normalized.displayPrice = normalized.salePrice;
   normalized.doublePriceTextMode = normalizeRakutenDoublePriceTextMode_(
-    source.rakuten_double_price_text_mode,
-    defaults.defaultDoublePriceTextMode,
+    '1',
+    '1',
     errors
   );
   normalized.stockReturnFlag = defaults.stockReturnFlag;
@@ -142,14 +141,14 @@ function buildRakutenItemsubRecord_(source, sourceRowNumber) {
     normalized: normalized,
     itemsubRow: itemsubRow,
     errors: errors,
-    shouldExport: normalized.publishFlag === '1' && errors.length === 0
+    shouldExport: errors.length === 0
   };
 }
 
 function buildRakutenReviewRow_(record) {
   return [
     record.sourceRowNumber,
-    record.source.publish_rakuten || '',
+    '',
     record.shouldExport ? '1' : '0',
     record.normalized.mainProductCode || '',
     record.normalized.mainTitle || '',
@@ -158,9 +157,9 @@ function buildRakutenReviewRow_(record) {
     record.source.rakuten_genre_id || '',
     itemsubValue_(record, '楽天ジャンルID'),
     record.normalized.salePrice || '',
-    record.source.rakuten_display_price || '',
+    record.normalized.salePrice || '',
     record.normalized.displayPrice || '',
-    record.source.rakuten_double_price_text_mode || '',
+    '1',
     record.normalized.doublePriceTextMode || '',
     record.normalized.deliverySetId || '',
     record.normalized.shippingCode || '',

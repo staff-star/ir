@@ -1,20 +1,16 @@
 function onOpen() {
   SpreadsheetApp.getUi()
-    .createMenu('Phase1')
-    .addItem('シートを初期化', 'initializePhase1Workbook')
-    .addItem('Phase2用シートを初期化', 'initializePhase2Sheets')
-    .addItem('説明書と見本を更新', 'refreshGuideSheet')
+    .createMenu('CSV出力ツール')
+    .addItem('シートを準備する', 'initializePhase1Workbook')
+    .addItem('使い方と見本を更新', 'refreshGuideSheet')
     .addSeparator()
-    .addItem('Phase1の確認用を更新', 'refreshConfirmationSheet')
-    .addItem('楽天確認用を更新', 'refreshRakutenConfirmationSheet')
-    .addItem('Yahoo確認用を更新', 'refreshYahooConfirmationSheet')
+    .addItem('共通の確認を更新', 'refreshConfirmationSheet')
+    .addItem('楽天の確認を更新', 'refreshRakutenConfirmationSheet')
+    .addItem('Yahooの確認を更新', 'refreshYahooConfirmationSheet')
     .addSeparator()
-    .addItem('中間CSVを書き出し', 'exportIntermediateCsv')
-    .addItem('ir-item.csvを書き出し', 'exportIrItemCsv')
-    .addItem('ir-itemsub_楽天.csvを書き出し', 'exportRakutenItemsubCsv')
-    .addItem('ir-itemsub_Yahoo.csvを書き出し', 'exportYahooItemsubCsv')
-    .addSeparator()
-    .addItem('テストを実行', 'runPhase1Tests')
+    .addItem('共通CSVを書き出す', 'exportIrItemCsv')
+    .addItem('楽天CSVを書き出す', 'exportRakutenItemsubCsv')
+    .addItem('YahooCSVを書き出す', 'exportYahooItemsubCsv')
     .addToUi();
 }
 
@@ -81,7 +77,7 @@ function exportIrItemCsv() {
     });
 
   if (exportRows.length === 0) {
-    throw new Error('Phase1 の出力対象がありません。publish_phase1 と エラー一覧 を確認してください。');
+    throw new Error('共通CSV の出力対象がありません。エラー一覧 を確認してください。');
   }
 
   downloadCsvFile_(
@@ -97,12 +93,12 @@ function buildPhase1Result_() {
     return buildPhase1Record_(sourceRow, index + 3);
   });
 
-  appendDuplicateProductCodeErrorsByPublishFlag_(records);
+  appendDuplicateProductCodeErrors_(records);
 
   return {
     records: records,
     reviewRows: [REVIEW_SCHEMA].concat(records.map(buildReviewRow_)),
-    errorRows: buildErrorRowsFromRecords_(records, ERROR_SCHEMA, 'publish_phase1')
+    errorRows: buildErrorRowsFromRecords_(records, ERROR_SCHEMA)
   };
 }
 
@@ -110,7 +106,6 @@ function buildPhase1Record_(source, sourceRowNumber) {
   const errors = [];
   const normalized = {};
 
-  normalized.publishFlag = normalizePublishFlag_(source.publish_phase1);
   normalized.productCode = normalizeProductCode_(source.product_code, errors);
   normalized.title = resolveTitle_(source, errors);
   normalized.category = normalizeCategory_(source.category, errors);
@@ -120,8 +115,8 @@ function buildPhase1Record_(source, sourceRowNumber) {
   normalized.displayPrice = resolveDisplayPrice_(normalized.salePrice);
   normalized.tax = resolveTaxRule_(source.food_flag, errors);
   normalized.janCode = normalizeJanCode_(source.jan_code, errors);
-  normalized.catchcopy = trimToString_(source.ai_catchcopy);
-  normalized.description = trimToString_(source.ai_description_material);
+  normalized.catchcopy = '';
+  normalized.description = '';
   normalized.imageBundle = buildImageBundle_(normalized.productCode, source.image_count, source.image_ext, errors);
 
   const irItemRow = createEmptyRowFromHeader_(IR_ITEM_HEADER);
@@ -167,7 +162,7 @@ function buildPhase1Record_(source, sourceRowNumber) {
     normalized: normalized,
     irItemRow: irItemRow,
     errors: errors,
-    shouldExport: normalized.publishFlag === '1' && errors.length === 0
+    shouldExport: errors.length === 0
   };
 }
 
@@ -175,9 +170,6 @@ function buildReviewRow_(record) {
   const urls = record.normalized.imageBundle.urls;
   return [
     record.sourceRowNumber,
-    record.source.publish_phase1 || '',
-    record.source.publish_rakuten || '',
-    record.source.publish_yahoo || '',
     record.shouldExport ? '1' : '0',
     record.normalized.productCode || '',
     record.normalized.title || '',
@@ -202,8 +194,6 @@ function buildReviewRow_(record) {
     urls[1] || '',
     urls[2] || '',
     urls[3] || '',
-    record.source.ai_catchcopy || '',
-    record.source.ai_description_material || '',
     record.source.attribute_template_key || '',
     record.source.note || '',
     String(record.errors.length),
@@ -311,7 +301,7 @@ function buildSampleSheetRows_() {
   return [
     Object.assign(blankRow.slice(), { 0: '入力見本' }),
     Object.assign(blankRow.slice(), { 0: 'このシートの使い方', 1: '5行目が見出し、6行目が説明、7行目以降が実際の入力例です。実務では「中間入力」シートの3行目から入力します。' }),
-    Object.assign(blankRow.slice(), { 0: '見方のコツ', 1: '青い欄はAIや元データをまとめて貼る欄、黄色い欄は人が確認する欄です。人が入れる欄は少なくしてあり、最後の3列で Phase1 / 楽天 / Yahoo の出力先を切り分けます。商品属性の欄は CSV 側に見出しだけ用意し、今は空欄で出します。' }),
+    Object.assign(blankRow.slice(), { 0: '見方のコツ', 1: '左側はAIがまとめて貼る欄、右側は人が最後に確認する欄です。出力先の切り替え列はなくし、CSVを書き出したときは全行を対象にして、エラー行だけを自動で除外します。' }),
     blankRow.slice(),
     sampleHeader,
     sampleNotes,
@@ -322,12 +312,6 @@ function buildSampleSheetRows_() {
       rakuten_genre_id: '100227',
       yahoo_product_category: '1001100',
       sale_price: '1480',
-      jan_code: '4542320580542',
-      food_flag: '1',
-      image_count: '3',
-      image_ext: 'jpg',
-      ai_catchcopy: '毎日使いやすい大容量サイズ',
-      ai_description_material: '国産茶葉を使った粉末抹茶です。製菓やドリンクにも使えます。',
       rakuten_title: '宇治抹茶 200g お菓子作りにも使いやすい粉末茶',
       rakuten_catchcopy: '毎日の一杯にも製菓にも使いやすい',
       rakuten_pc_desc: '楽天PC用の説明文です。素材や使い方を入れます。',
@@ -337,15 +321,14 @@ function buildSampleSheetRows_() {
       yahoo_catchcopy: 'お菓子作りにも飲用にも使いやすい',
       yahoo_desc: 'Yahoo用の商品説明です。HTMLも扱う想定です。',
       yahoo_sp_free: 'スマホだけで見せたい補足情報を入れます。',
+      food_flag: '1',
+      image_count: '3',
+      image_ext: 'jpg',
       rakuten_delivery_set_id: '1',
-      rakuten_display_price: '1480',
-      rakuten_double_price_text_mode: '1',
       yahoo_shipping_group_id: '2',
       attribute_template_key: '',
       note: '初回出品分',
-      publish_phase1: '1',
-      publish_rakuten: '1',
-      publish_yahoo: '1'
+      jan_code: '4542320580542'
     }),
     buildSchemaRowFromObject_({
       product_code: 'teabag-houjicha-20p',
@@ -354,23 +337,16 @@ function buildSampleSheetRows_() {
       rakuten_genre_id: '100316',
       yahoo_product_category: '1001100',
       sale_price: '1080',
-      jan_code: '4900000000000',
-      food_flag: '1',
-      image_count: '2',
-      image_ext: 'jpg',
-      ai_catchcopy: '香ばしさが広がる定番茶',
-      ai_description_material: '国産茶葉を使ったほうじ茶です。毎日の食事にも合わせやすい味わいです。',
       rakuten_title: 'ほうじ茶 ティーバッグ 20包 毎日飲みやすい香ばしさ',
       yahoo_title: 'ほうじ茶 ティーバッグ 20包',
       yahoo_desc: 'Yahoo用の説明は短めにまとめています。',
       yahoo_sp_free: 'スマホ向けの補足だけを入れます。',
-      rakuten_display_price: '',
-      rakuten_double_price_text_mode: '',
+      food_flag: '1',
+      image_count: '2',
+      image_ext: 'jpg',
       attribute_template_key: '',
       note: 'Yahooは後日開始',
-      publish_phase1: '1',
-      publish_rakuten: '1',
-      publish_yahoo: '0'
+      jan_code: '4900000000000'
     })
   ];
 }
@@ -408,7 +384,7 @@ function populateGuideSheet_(sheet) {
   setMergedValue_(
     sheet,
     'A3:J4',
-    '入力は「中間入力」1枚でまとめて行い、その後に Phase1、楽天、Yahoo の確認用シートへ分かれます。人が入れる欄は必要最小限にし、出したい先だけ最後の3列を 1 にして、必要なCSVだけ作成します。商品属性の欄は今は入力せず、CSV に見出しだけ残します。'
+    '入力は「中間入力」1枚でまとめて行い、その後に 共通、楽天、Yahoo の確認用シートへ分かれます。CSVを書き出すときは全行を対象にし、エラー行だけを自動で除外します。'
   );
 
   setMergedValue_(sheet, 'A6:C8', '1. データ入力\n共通の中間入力へ入れる');
@@ -421,7 +397,7 @@ function populateGuideSheet_(sheet) {
   setMergedValue_(
     sheet,
     'A12:D27',
-    '青い欄はAIや元データを一気に貼る欄です。黄色い欄は人が確認して決める欄です。\n\n列のまとまりは次の4つです。\n・共通入力: 商品コード、共通商品名、価格、JAN、画像枚数など\n・楽天入力: 楽天用の商品名、説明文、販売説明文など\n・Yahoo入力: Yahoo用の商品名、説明文、スマホ自由欄など\n・確認と出力設定: 楽天の配送方法セット番号、楽天の表示価格、楽天の二重価格文言、Yahooの配送グループ番号、属性テンプレート名、publishフラグなど\n\n最後の3列は出力先のスイッチです。\n・publish_phase1 = ir-item.csv\n・publish_rakuten = ir-itemsub_楽天.csv\n・publish_yahoo = ir-itemsub_Yahoo.csv\n\n楽天の送料は「配送方法セット番号」から自動で決まります。楽天の表示価格を空欄にすると販売価格と同じ値を使います。商品属性の列は CSV に見出しだけあり、今は内容を入れません。YahooのパスやページIDはこの段階では入力しません。\n\n1行に1商品ずつ入れます。画像は白背景画像なしで、1 から image_count の枚数だけ自動生成します。'
+    '青い欄はAIや元データを一気に貼る欄です。黄色い欄は人が確認して決める欄です。\n\n列のまとまりは次の2つです。\n・AI一括入力: 商品コード、共通商品名、カテゴリ、各モール向けの名前と説明文\n・人が確認する入力: 食品フラグ、画像枚数、画像の種類、配送番号、属性テンプレート名、メモ、JANコード\n\n出力先を選ぶ列はありません。共通CSV、楽天CSV、YahooCSV のどれを押しても全行を対象にし、エラー行だけを自動で除外します。\n\n共通CSVでは表示価格は販売価格と同じ値です。説明系は空欄で出します。楽天CSVでは表示価格も販売価格と同じ値、二重価格文言は 1 固定です。YahooCSVでは商品コードや価格など一部の列を空欄で出します。\n\n1行に1商品ずつ入れます。画像は白背景画像なしで、1 から image_count の枚数だけ自動生成します。'
   );
   setMergedValue_(sheet, 'E12:J12', '画面イメージ: 入力見本');
   sheet.getRange('E13').setFormula("=ARRAY_CONSTRAIN('入力見本'!A5:F8,4,6)");
@@ -432,7 +408,7 @@ function populateGuideSheet_(sheet) {
   setMergedValue_(
     sheet,
     'A31:D48',
-    '入力後はメニューから確認用を更新します。\n\nPhase1の確認用では、共通データから ir-item.csv に入る内容を見ます。\n楽天確認用では、楽天専用の商品名、説明文、配送方法セット番号から決まる送料、楽天ジャンルID、表示価格、二重価格文言などを見ます。商品属性の欄は今は空欄のままです。\nYahoo確認用では、Yahoo専用の商品名、隠しページ設定、配送グループなどを見ます。\n\nエラーが出たら、直す場所は必ず「中間入力」です。修正したあと、もう一度その確認用を更新してください。'
+    '入力後はメニューから確認用を更新します。\n\n共通の確認では ir-item.csv に入る内容を見ます。\n楽天の確認では、楽天専用の商品名、送料、表示価格、固定値の入り方を見ます。\nYahooの確認では、Yahoo専用の商品名、隠しページ設定、配送グループなどを見ます。\n\nエラーが出たら、直す場所は必ず「中間入力」です。修正したあと、もう一度その確認用を更新してください。'
   );
   setMergedValue_(sheet, 'E31:J31', '画面イメージ: 確認用');
   sheet.getRange('E32').setFormula("=ARRAY_CONSTRAIN('確認用'!A1:F4,4,6)");
@@ -445,36 +421,28 @@ function populateGuideSheet_(sheet) {
   setMergedValue_(
     sheet,
     'A52:D68',
-    '確認用を見て問題がなければ、必要なCSVだけ書き出します。\n\n出力条件は先ごとに別です。\n・Phase1: publish_phase1 = 1 でエラーなし\n・楽天: publish_rakuten = 1 でエラーなし\n・Yahoo: publish_yahoo = 1 でエラーなし\n\nCSVはこのパソコンにダウンロードされます。ブラウザの確認が出たら保存を許可してください。'
+    '確認用を見て問題がなければ、必要なCSVだけ書き出します。\n\nどのCSVも全行を対象にし、エラーがある行だけ自動で除外します。\n\nCSVはこのパソコンにダウンロードされます。ブラウザの確認が出たら保存を許可してください。'
   );
   setMergedValue_(sheet, 'E52:J52', 'メニュー例');
   setMergedValue_(
     sheet,
     'E53:J58',
-    'Phase1\n・シートを初期化\n・Phase2用シートを初期化\n・説明書と見本を更新\n・Phase1の確認用を更新\n・楽天確認用を更新\n・Yahoo確認用を更新'
+    'CSV出力ツール\n・シートを準備する\n・使い方と見本を更新\n・共通の確認を更新\n・楽天の確認を更新\n・Yahooの確認を更新\n・共通CSVを書き出す'
   );
   setMergedValue_(sheet, 'E60:J60', '出力されるファイル');
   setMergedValue_(
     sheet,
     'E61:J66',
-    'ir-item_20260405_090000.csv\nir-itemsub_楽天_20260405_090000.csv\nir-itemsub_Yahoo_20260405_090000.csv\nphase1_intermediate_20260405_090000.csv'
+    'ir-item_20260405_090000.csv\nir-itemsub_楽天_20260405_090000.csv\nir-itemsub_Yahoo_20260405_090000.csv'
   );
 
-  setMergedValue_(sheet, 'A71:J71', 'publishフラグの使い分け');
-  setMergedValue_(sheet, 'A72:C75', 'publish_phase1');
-  setMergedValue_(sheet, 'D72:J75', '共通の ir-item.csv を出したいときに 1 を入れます。楽天やYahooを出さなくても、ここだけ 1 にできます。');
-  setMergedValue_(sheet, 'A76:C79', 'publish_rakuten');
-  setMergedValue_(sheet, 'D76:J79', '楽天 itemsub を出したいときに 1 を入れます。楽天用の名前や説明文が未入力でも、共通の値で補えるところは補います。');
-  setMergedValue_(sheet, 'A80:C83', 'publish_yahoo');
-  setMergedValue_(sheet, 'D80:J83', 'Yahoo itemsub を出したいときに 1 を入れます。Yahoo用のページIDやパスは、空欄なら共通の値を土台にします。');
-
-  setMergedValue_(sheet, 'A86:J86', '困ったとき');
-  setMergedValue_(sheet, 'A87:C90', '楽天だけ止まる');
-  setMergedValue_(sheet, 'D87:J90', '「楽天エラー一覧」を見てください。配送方法セット番号、表示価格、二重価格文言など、楽天専用の欄で止まることがあります。商品属性は今は未入力のままで構いません。');
-  setMergedValue_(sheet, 'A91:C94', 'Yahooだけ止まる');
-  setMergedValue_(sheet, 'D91:J94', '「Yahooエラー一覧」を見てください。パス、ページID、配送グループ番号、公開設定などを確認します。');
-  setMergedValue_(sheet, 'A95:C98', '何も出ない');
-  setMergedValue_(sheet, 'D95:J98', '対象の publish 列が 1 になっているか、各エラー一覧に理由が出ていないかを確認してください。');
+  setMergedValue_(sheet, 'A71:J71', '困ったとき');
+  setMergedValue_(sheet, 'A72:C75', '楽天だけ止まる');
+  setMergedValue_(sheet, 'D72:J75', '「楽天エラー一覧」を見てください。配送方法セット番号、販売価格、食品フラグなど、楽天でも共通でも使う欄が原因になることがあります。');
+  setMergedValue_(sheet, 'A76:C79', 'Yahooだけ止まる');
+  setMergedValue_(sheet, 'D76:J79', '「Yahooエラー一覧」を見てください。配送グループ番号や商品名などを確認します。');
+  setMergedValue_(sheet, 'A80:C83', '何も出ない');
+  setMergedValue_(sheet, 'D80:J83', '各エラー一覧に理由が出ていないかを確認してください。エラーがなければ全行が出力対象です。');
 }
 
 function applyGuideSheetFormat_(sheet) {
@@ -497,7 +465,7 @@ function applyGuideSheetFormat_(sheet) {
   sheet.getRange('H6:H8').setFontSize(18).setFontWeight('bold').setHorizontalAlignment('center').setVerticalAlignment('middle');
   sheet.getRange('I6:J8').setBackground('#fce5cd').setFontWeight('bold').setHorizontalAlignment('center').setVerticalAlignment('middle').setBorder(true, true, true, true, true, true);
 
-  ['A11:J11', 'A30:J30', 'A51:J51', 'A71:J71', 'A86:J86'].forEach(function (a1) {
+  ['A11:J11', 'A30:J30', 'A51:J51', 'A71:J71'].forEach(function (a1) {
     sheet.getRange(a1).setBackground('#b6d7a8').setFontWeight('bold').setFontSize(12);
   });
 
@@ -513,11 +481,11 @@ function applyGuideSheetFormat_(sheet) {
     sheet.getRange(a1).setBackground('#ffffff').setBorder(true, true, true, true, true, true).setFontSize(9);
   });
 
-  ['E53:J58', 'E61:J66', 'A72:C75', 'D72:J75', 'A76:C79', 'D76:J79', 'A80:C83', 'D80:J83', 'A87:C90', 'D87:J90', 'A91:C94', 'D91:J94', 'A95:C98', 'D95:J98'].forEach(function (a1) {
+  ['E53:J58', 'E61:J66', 'A72:C75', 'D72:J75', 'A76:C79', 'D76:J79', 'A80:C83', 'D80:J83'].forEach(function (a1) {
     sheet.getRange(a1).setBackground('#fffdf0').setBorder(true, true, true, true, true, true);
   });
 
-  ['A72:C75', 'A76:C79', 'A80:C83', 'A87:C90', 'A91:C94', 'A95:C98'].forEach(function (a1) {
+  ['A72:C75', 'A76:C79', 'A80:C83'].forEach(function (a1) {
     sheet.getRange(a1).setFontWeight('bold').setHorizontalAlignment('center').setVerticalAlignment('middle');
   });
 
@@ -577,11 +545,11 @@ function createEmptyRowFromHeader_(headerRow) {
   }, {});
 }
 
-function appendDuplicateProductCodeErrorsByPublishFlag_(records) {
+function appendDuplicateProductCodeErrors_(records) {
   const buckets = {};
 
   records.forEach(function (record) {
-    if (!record.normalized.productCode || record.normalized.publishFlag !== '1') {
+    if (!record.normalized.productCode) {
       return;
     }
     if (!buckets[record.normalized.productCode]) {
@@ -602,7 +570,7 @@ function appendDuplicateProductCodeErrorsByPublishFlag_(records) {
   });
 }
 
-function buildErrorRowsFromRecords_(records, schema, publishKey) {
+function buildErrorRowsFromRecords_(records, schema) {
   const rows = [schema];
   records.forEach(function (record) {
     record.errors.forEach(function (error) {
@@ -611,7 +579,7 @@ function buildErrorRowsFromRecords_(records, schema, publishKey) {
         error.field,
         error.code,
         error.message,
-        record.source[publishKey] || '',
+        record.shouldExport ? '1' : '0',
         record.normalized.productCode || ''
       ]);
     });
