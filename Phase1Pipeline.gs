@@ -2,10 +2,17 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Phase1')
     .addItem('シートを初期化', 'initializePhase1Workbook')
-    .addItem('説明書を更新', 'refreshGuideSheet')
-    .addItem('確認用シートを更新', 'refreshConfirmationSheet')
+    .addItem('Phase2用シートを初期化', 'initializePhase2Sheets')
+    .addItem('説明書と見本を更新', 'refreshGuideSheet')
+    .addSeparator()
+    .addItem('Phase1の確認用を更新', 'refreshConfirmationSheet')
+    .addItem('楽天確認用を更新', 'refreshRakutenConfirmationSheet')
+    .addItem('Yahoo確認用を更新', 'refreshYahooConfirmationSheet')
+    .addSeparator()
     .addItem('中間CSVを書き出し', 'exportIntermediateCsv')
     .addItem('ir-item.csvを書き出し', 'exportIrItemCsv')
+    .addItem('ir-itemsub_楽天.csvを書き出し', 'exportRakutenItemsubCsv')
+    .addItem('ir-itemsub_Yahoo.csvを書き出し', 'exportYahooItemsubCsv')
     .addSeparator()
     .addItem('テストを実行', 'runPhase1Tests')
     .addToUi();
@@ -13,13 +20,24 @@ function onOpen() {
 
 function initializePhase1Workbook() {
   const ss = getActiveSpreadsheet_();
-  writeGuideSheet_();
-  initializeSheet_(ss, PHASE1_CONFIG.sheetNames.input, buildInputSheetRows_(), 1);
+  writeInputSheet_();
+  writeSampleSheet_();
   initializeSheet_(ss, PHASE1_CONFIG.sheetNames.review, [REVIEW_SCHEMA], 1);
   initializeSheet_(ss, PHASE1_CONFIG.sheetNames.errors, [ERROR_SCHEMA], 1);
+  initializePhase2Sheets();
+  writeGuideSheet_();
+}
+
+function initializePhase2Sheets() {
+  const ss = getActiveSpreadsheet_();
+  initializeSheet_(ss, PHASE1_CONFIG.sheetNames.rakutenReview, [RAKUTEN_REVIEW_SCHEMA], 1);
+  initializeSheet_(ss, PHASE1_CONFIG.sheetNames.rakutenErrors, [RAKUTEN_ERROR_SCHEMA], 1);
+  initializeSheet_(ss, PHASE1_CONFIG.sheetNames.yahooReview, [YAHOO_REVIEW_SCHEMA], 1);
+  initializeSheet_(ss, PHASE1_CONFIG.sheetNames.yahooErrors, [YAHOO_ERROR_SCHEMA], 1);
 }
 
 function refreshGuideSheet() {
+  writeSampleSheet_();
   writeGuideSheet_();
 }
 
@@ -42,8 +60,11 @@ function exportIntermediateCsv() {
     }));
   });
 
-  const fileName = buildExportFileName_('phase1_intermediate', 'csv');
-  createCsvFile_(fileName, matrix, PHASE1_CONFIG.exportEncoding.intermediate);
+  downloadCsvFile_(
+    buildExportFileName_('phase1_intermediate', 'csv'),
+    matrix,
+    PHASE1_CONFIG.exportEncoding.intermediate
+  );
 }
 
 function exportIrItemCsv() {
@@ -52,9 +73,7 @@ function exportIrItemCsv() {
   writeErrorSheet_(result.errorRows);
 
   const exportRows = result.records
-    .filter(function (record) {
-      return record.shouldExport;
-    })
+    .filter(function (record) { return record.shouldExport; })
     .map(function (record) {
       return IR_ITEM_HEADER.map(function (header) {
         return normalizeCellValue_(record.irItemRow[header]);
@@ -62,12 +81,14 @@ function exportIrItemCsv() {
     });
 
   if (exportRows.length === 0) {
-    throw new Error('出力対象がありません。publish_flag または エラー一覧を確認してください。');
+    throw new Error('Phase1 の出力対象がありません。publish_phase1 と エラー一覧 を確認してください。');
   }
 
-  const matrix = [IR_ITEM_HEADER].concat(exportRows);
-  const fileName = buildExportFileName_('ir-item', 'csv');
-  createCsvFile_(fileName, matrix, PHASE1_CONFIG.exportEncoding.irItem);
+  downloadCsvFile_(
+    buildExportFileName_('ir-item', 'csv'),
+    [IR_ITEM_HEADER].concat(exportRows),
+    PHASE1_CONFIG.exportEncoding.irItem
+  );
 }
 
 function buildPhase1Result_() {
@@ -76,27 +97,12 @@ function buildPhase1Result_() {
     return buildPhase1Record_(sourceRow, index + 3);
   });
 
-  appendDuplicateProductCodeErrors_(records);
-
-  const reviewRows = [REVIEW_SCHEMA].concat(records.map(buildReviewRow_));
-  const errorRows = [ERROR_SCHEMA];
-  records.forEach(function (record) {
-    record.errors.forEach(function (error) {
-      errorRows.push([
-        record.sourceRowNumber,
-        error.field,
-        error.code,
-        error.message,
-        record.source.publish_flag || '',
-        record.normalized.productCode || ''
-      ]);
-    });
-  });
+  appendDuplicateProductCodeErrorsByPublishFlag_(records);
 
   return {
     records: records,
-    reviewRows: reviewRows,
-    errorRows: errorRows
+    reviewRows: [REVIEW_SCHEMA].concat(records.map(buildReviewRow_)),
+    errorRows: buildErrorRowsFromRecords_(records, ERROR_SCHEMA, 'publish_phase1')
   };
 }
 
@@ -104,35 +110,27 @@ function buildPhase1Record_(source, sourceRowNumber) {
   const errors = [];
   const normalized = {};
 
-  normalized.publishFlag = normalizePublishFlag_(source.publish_flag);
-  normalized.productCode = normalizeProductCode_(source.product_code || source.product_code_seed, errors);
+  normalized.publishFlag = normalizePublishFlag_(source.publish_phase1);
+  normalized.productCode = normalizeProductCode_(source.product_code, errors);
   normalized.title = resolveTitle_(source, errors);
-  normalized.category = normalizeCategory_(source.category_id_final, errors);
-  normalized.salePrice = resolveSalePrice_(source.sale_price, source.price_suggested, errors);
+  normalized.category = normalizeCategory_(source.category, errors);
+  normalized.rakutenGenreId = normalizeRakutenGenreId_(source.rakuten_genre_id, errors);
+  normalized.yahooProductCategory = normalizeYahooProductCategory_(source.yahoo_product_category, errors);
+  normalized.salePrice = resolveSalePrice_(source.sale_price, errors);
   normalized.displayPrice = resolveDisplayPrice_(normalized.salePrice);
-  normalized.tax = resolveTaxRule_(source.tax_class, errors);
-  normalized.warehouseFlag = normalizeZeroOneField_(
-    source.warehouse_flag,
-    PHASE1_CONFIG.defaultWarehouseFlag,
-    'warehouse_flag',
-    errors
-  );
+  normalized.tax = resolveTaxRule_(source.food_flag, errors);
   normalized.janCode = normalizeJanCode_(source.jan_code, errors);
   normalized.catchcopy = trimToString_(source.ai_catchcopy);
   normalized.description = trimToString_(source.ai_description_material);
-  normalized.imageBundle = buildImageBundle_(
-    normalized.productCode,
-    source.image_count,
-    source.image_ext,
-    source.has_white_image,
-    errors
-  );
+  normalized.imageBundle = buildImageBundle_(normalized.productCode, source.image_count, source.image_ext, errors);
 
-  const irItemRow = createEmptyIrItemRow_();
+  const irItemRow = createEmptyRowFromHeader_(IR_ITEM_HEADER);
   irItemRow['商品コード（楽天URL）'] = normalized.productCode;
   irItemRow['楽天商品番号'] = PHASE1_CONFIG.copyProductCodeToRakutenItemNumber ? normalized.productCode : '';
   irItemRow['カテゴリ'] = normalized.category;
   irItemRow['商品名'] = normalized.title;
+  irItemRow['楽天ジャンルID'] = normalized.rakutenGenreId;
+  irItemRow['yahooプロダクトカテゴリ'] = normalized.yahooProductCategory;
   irItemRow['キャッチコピー'] = normalized.catchcopy;
   irItemRow['モバイルキャッチコピー'] = normalized.catchcopy;
   irItemRow['販売価格'] = normalized.salePrice;
@@ -142,7 +140,7 @@ function buildPhase1Record_(source, sourceRowNumber) {
   irItemRow['表示価格'] = normalized.displayPrice;
   irItemRow['送料'] = PHASE1_CONFIG.defaultShippingCode;
   irItemRow['個別送料'] = PHASE1_CONFIG.defaultIndividualShippingCode;
-  irItemRow['倉庫指定'] = normalized.warehouseFlag;
+  irItemRow['倉庫指定'] = PHASE1_CONFIG.defaultWarehouseFlag;
   irItemRow['JANコード'] = normalized.janCode;
   irItemRow['PC用商品説明文'] = normalized.description;
   irItemRow['PC用商品説明文改行'] = '0';
@@ -161,7 +159,7 @@ function buildPhase1Record_(source, sourceRowNumber) {
     irItemRow[`画像${index + 1}`] = url;
   });
 
-  const shouldExport = normalized.publishFlag === '1' && errors.length === 0;
+  validateAttributeDependency_(source, normalized, errors);
 
   return {
     sourceRowNumber: sourceRowNumber,
@@ -169,70 +167,36 @@ function buildPhase1Record_(source, sourceRowNumber) {
     normalized: normalized,
     irItemRow: irItemRow,
     errors: errors,
-    shouldExport: shouldExport
+    shouldExport: normalized.publishFlag === '1' && errors.length === 0
   };
-}
-
-function appendDuplicateProductCodeErrors_(records) {
-  const buckets = {};
-
-  records.forEach(function (record) {
-    if (!record.normalized.productCode || record.normalized.publishFlag !== '1') {
-      return;
-    }
-    if (!buckets[record.normalized.productCode]) {
-      buckets[record.normalized.productCode] = [];
-    }
-    buckets[record.normalized.productCode].push(record);
-  });
-
-  Object.keys(buckets).forEach(function (productCode) {
-    if (buckets[productCode].length <= 1) {
-      return;
-    }
-    buckets[productCode].forEach(function (record) {
-      record.errors.push({
-        field: 'product_code',
-        code: 'DUPLICATE_PRODUCT_CODE',
-        message: `product_code が重複しています: ${productCode}`
-      });
-      record.shouldExport = false;
-    });
-  });
 }
 
 function buildReviewRow_(record) {
   const urls = record.normalized.imageBundle.urls;
-  const errorMessages = record.errors.map(function (error) {
-    return `[${error.code}] ${error.message}`;
-  }).join('\n');
-
   return [
     record.sourceRowNumber,
-    record.source.publish_flag || '',
+    record.source.publish_phase1 || '',
+    record.source.publish_rakuten || '',
+    record.source.publish_yahoo || '',
     record.shouldExport ? '1' : '0',
-    record.source.product_code_seed || '',
-    record.source.product_code || '',
     record.normalized.productCode || '',
-    record.source.raw_name || '',
-    record.source.ai_title || '',
-    record.source.final_title_override || '',
     record.normalized.title || '',
-    record.source.category_id_final || '',
+    record.source.category || '',
     record.normalized.category || '',
-    record.source.price_suggested || '',
+    record.source.rakuten_genre_id || '',
+    record.normalized.rakutenGenreId || '',
+    record.source.yahoo_product_category || '',
+    record.normalized.yahooProductCategory || '',
     record.source.sale_price || '',
     record.normalized.salePrice || '',
     record.normalized.displayPrice || '',
     record.source.jan_code || '',
-    record.source.warehouse_flag || '',
-    record.source.tax_class || '',
+    record.source.food_flag || '',
     record.normalized.tax.taxFlag || '',
     record.normalized.tax.taxRate || '',
     record.normalized.tax.reducedTaxRateFlag || '',
     record.source.image_count || '',
     record.source.image_ext || '',
-    record.source.has_white_image || '',
     String(urls.length),
     urls[0] || '',
     urls[1] || '',
@@ -243,7 +207,7 @@ function buildReviewRow_(record) {
     record.source.attribute_template_key || '',
     record.source.note || '',
     String(record.errors.length),
-    errorMessages
+    buildErrorMessages_(record.errors)
   ];
 }
 
@@ -263,6 +227,7 @@ function readInputRows_() {
     if (line.every(isBlankCell_)) {
       return;
     }
+
     const row = {};
     PHASE1_INPUT_SCHEMA.forEach(function (item, index) {
       row[item.key] = normalizeCellValue_(line[index]);
@@ -281,13 +246,27 @@ function writeErrorSheet_(rows) {
   initializeSheet_(getActiveSpreadsheet_(), PHASE1_CONFIG.sheetNames.errors, rows, 1);
 }
 
+function writeInputSheet_() {
+  const ss = getActiveSpreadsheet_();
+  const rows = buildInputSheetRows_();
+  initializeSheet_(ss, PHASE1_CONFIG.sheetNames.input, rows, 2);
+  applyInputSheetFormat_(getOrCreateSheet_(PHASE1_CONFIG.sheetNames.input, ss), rows[0].length);
+}
+
 function writeGuideSheet_() {
   const ss = getActiveSpreadsheet_();
   const rows = buildGuideSheetRows_();
-  initializeSheet_(ss, PHASE1_CONFIG.sheetNames.guide, rows, 2);
-
+  initializeSheet_(ss, PHASE1_CONFIG.sheetNames.guide, rows, 4);
   const sheet = getOrCreateSheet_(PHASE1_CONFIG.sheetNames.guide, ss);
-  applyGuideSheetFormat_(sheet, rows.length);
+  populateGuideSheet_(sheet);
+  applyGuideSheetFormat_(sheet);
+}
+
+function writeSampleSheet_() {
+  const ss = getActiveSpreadsheet_();
+  const rows = buildSampleSheetRows_();
+  initializeSheet_(ss, PHASE1_CONFIG.sheetNames.sample, rows, 5);
+  applySampleSheetFormat_(getOrCreateSheet_(PHASE1_CONFIG.sheetNames.sample, ss), rows.length, rows[4].length);
 }
 
 function initializeSheet_(ss, sheetName, rows, frozenRows) {
@@ -314,72 +293,283 @@ function initializeSheet_(ss, sheetName, rows, frozenRows) {
 
 function buildInputSheetRows_() {
   return [
-    PHASE1_INPUT_SCHEMA.map(function (item) { return item.key; }),
+    PHASE1_INPUT_SCHEMA.map(function (item) { return buildInputHeaderLabel_(item); }),
     PHASE1_INPUT_SCHEMA.map(function (item) { return item.note; })
   ];
 }
 
 function buildGuideSheetRows_() {
+  return buildBlankMatrix_(98, 10);
+}
+
+function buildSampleSheetRows_() {
+  const columnCount = PHASE1_INPUT_SCHEMA.length;
+  const blankRow = new Array(columnCount).fill('');
+  const sampleHeader = PHASE1_INPUT_SCHEMA.map(function (item) { return buildInputHeaderLabel_(item); });
+  const sampleNotes = PHASE1_INPUT_SCHEMA.map(function (item) { return item.note; });
+
   return [
-    ['Phase1 使い方', '', ''],
-    ['このシートの目的', 'この表は「どこに何を書けばよいか」を分かりやすくまとめた説明書です。迷ったら最初にここを見てください。', ''],
-    ['', '', ''],
-    ['やること', '内容', '補足'],
-    ['1. 最初の準備', 'メニューの「Phase1」から「シートを初期化」を押します。', '最初だけで大丈夫です。'],
-    ['2. 入力する', '「中間入力」シートの3行目から、商品ごとの情報を1行ずつ入れます。', '1行に1商品です。'],
-    ['3. 確認する', 'メニューの「確認用シートを更新」を押します。', '「確認用」と「エラー一覧」が更新されます。'],
-    ['4. 直す', '「エラー一覧」に出た行や、「確認用」で気になる行を「中間入力」で直します。', '直したら、もう一度「確認用シートを更新」を押します。'],
-    ['5. 出力する', '問題がなければ「ir-item.csvを書き出し」を押します。', '出来上がったCSVは Drive に保存されます。'],
-    ['', '', ''],
-    ['中間入力でよく使う欄', '何を書くか', '例'],
-    ['product_code_seed', '商品の管理コードの元になる文字です。まだ確定していないときはこちらだけでも構いません。', 'matcha-200g'],
-    ['product_code', '商品の管理コードを自分で決めたいときに書きます。空なら上の欄から自動で整えます。', 'uji-matcha-200g'],
-    ['raw_name', '元の商品名です。元データに書かれている名前を入れます。', '宇治抹茶 200g'],
-    ['ai_title', 'AI が考えた商品名です。', '宇治抹茶 200g 送料無料'],
-    ['final_title_override', '最終的に使いたい商品名です。ここに書いた名前がいちばん優先されます。', '京都宇治抹茶 200g'],
-    ['category_id_final', '商品の売り場番号です。数字だけでも大丈夫です。', '683 または 683|530'],
-    ['price_suggested', 'AI が出した参考価格です。', '1480'],
-    ['sale_price', '実際に出したい販売価格です。空なら参考価格を使います。', '1480'],
-    ['jan_code', 'JANコードがある商品だけ入れます。', '4542320580542'],
-    ['warehouse_flag', '倉庫の使い分けがあるときだけ入れます。通常は空欄で構いません。', '0'],
-    ['tax_class', '食品なら reduced、食品以外なら standard を入れます。', 'reduced'],
-    ['image_count', '白背景画像を除いた、通常画像の枚数です。', '3'],
-    ['image_ext', '画像の種類です。png や jpg を入れます。', 'png'],
-    ['has_white_image', '白背景画像があるなら 1、ないなら 0 です。', '1'],
-    ['ai_catchcopy', '短いひとこと説明です。', '毎日使いやすい大容量サイズ'],
-    ['ai_description_material', '商品説明の元になる文章です。', '国産茶葉を使った粉末抹茶です。'],
-    ['note', 'メモ欄です。CSVには出ません。', '初回出品分'],
-    ['publish_flag', '出力したい行だけ 1 を入れます。出さない行は 0 か空欄にします。', '1'],
-    ['', '', ''],
-    ['困ったときの見方', '見る場所', '意味'],
-    ['商品が出力されない', 'エラー一覧', 'その行に直すべき内容が出ます。'],
-    ['出力対象か知りたい', '確認用 の「出力対象」', '1 なら出ます。0 なら出ません。'],
-    ['画像の並びを見たい', '確認用 の 画像1〜画像4', '実際に作られるURLを確認できます。'],
-    ['どの名前で出るか知りたい', '確認用 の「確定商品名」', '最終的にCSVへ入る商品名です。'],
-    ['', '', ''],
-    ['入力のコツ', '内容', ''],
-    ['価格', '数字だけを入れてください。カンマや円は入れません。', '1480 のように書きます。'],
-    ['商品コード', '英小文字、数字、-、_ だけが安全です。', '空白や記号が多いと自動で直されます。'],
-    ['カテゴリ', '番号が分からないときは、使う予定の番号を確認してから入れてください。', '数字が1つでも入っていれば整形されます。'],
-    ['画像', '画像URLは自分で書かなくて大丈夫です。コードと枚数から自動で作られます。', '画像の置き場所は事前準備が必要です。']
+    Object.assign(blankRow.slice(), { 0: '入力見本' }),
+    Object.assign(blankRow.slice(), { 0: 'このシートの使い方', 1: '5行目が見出し、6行目が説明、7行目以降が実際の入力例です。実務では「中間入力」シートの3行目から入力します。' }),
+    Object.assign(blankRow.slice(), { 0: '見方のコツ', 1: '青い欄はAIや元データをまとめて貼る欄、黄色い欄は人が確認する欄です。最後の3列で Phase1 / 楽天 / Yahoo の出力先を切り分けます。' }),
+    blankRow.slice(),
+    sampleHeader,
+    sampleNotes,
+    buildSchemaRowFromObject_({
+      product_code: 'uji-matcha-200g',
+      title: '宇治抹茶 200g 送料無料',
+      category: '683|530',
+      rakuten_genre_id: '100227',
+      yahoo_product_category: '1001100',
+      sale_price: '1480',
+      jan_code: '4542320580542',
+      food_flag: '1',
+      image_count: '3',
+      image_ext: 'jpg',
+      ai_catchcopy: '毎日使いやすい大容量サイズ',
+      ai_description_material: '国産茶葉を使った粉末抹茶です。製菓やドリンクにも使えます。',
+      rakuten_title: '宇治抹茶 200g お菓子作りにも使いやすい粉末茶',
+      rakuten_catchcopy: '毎日の一杯にも製菓にも使いやすい',
+      rakuten_pc_desc: '楽天PC用の説明文です。素材や使い方を入れます。',
+      rakuten_sales_desc: '期間限定のおすすめ価格です。',
+      rakuten_sp_desc: '楽天スマホで読みやすい短めの説明です。',
+      yahoo_title: '宇治抹茶 200g 国産茶葉使用',
+      yahoo_catchcopy: 'お菓子作りにも飲用にも使いやすい',
+      yahoo_desc: 'Yahoo用の商品説明です。HTMLも扱う想定です。',
+      yahoo_sp_free: 'スマホだけで見せたい補足情報を入れます。',
+      rakuten_display_category: '683|530',
+      rakuten_sale_start: '202604051200',
+      rakuten_sale_end: '202604302359',
+      rakuten_shipping_code: '0',
+      rakuten_delivery_set_id: '1',
+      rakuten_delivery_lead_time: '1',
+      rakuten_stock_lead_time: '10',
+      rakuten_stock_management_id: '1',
+      rakuten_search_visible_flag: '0',
+      rakuten_double_price_text: '1',
+      yahoo_path: '683|530',
+      yahoo_page_code: 'uji-matcha-200g',
+      yahoo_shipping_group_id: '2',
+      yahoo_upload_target_flag: '1',
+      yahoo_hidden_page_flag: '0',
+      attribute_template_key: 'default',
+      note: '初回出品分',
+      publish_phase1: '1',
+      publish_rakuten: '1',
+      publish_yahoo: '1'
+    }),
+    buildSchemaRowFromObject_({
+      product_code: 'teabag-houjicha-20p',
+      title: 'ほうじ茶 ティーバッグ 20包',
+      category: '217199',
+      rakuten_genre_id: '100316',
+      yahoo_product_category: '1001100',
+      sale_price: '1080',
+      jan_code: '4900000000000',
+      food_flag: '1',
+      image_count: '2',
+      image_ext: 'jpg',
+      ai_catchcopy: '香ばしさが広がる定番茶',
+      ai_description_material: '国産茶葉を使ったほうじ茶です。毎日の食事にも合わせやすい味わいです。',
+      rakuten_title: 'ほうじ茶 ティーバッグ 20包 毎日飲みやすい香ばしさ',
+      yahoo_title: 'ほうじ茶 ティーバッグ 20包',
+      yahoo_desc: 'Yahoo用の説明は短めにまとめています。',
+      yahoo_sp_free: 'スマホ向けの補足だけを入れます。',
+      rakuten_display_category: '217199',
+      rakuten_shipping_code: '0',
+      yahoo_path: '217199',
+      yahoo_page_code: 'teabag-houjicha-20p',
+      yahoo_upload_target_flag: '1',
+      yahoo_hidden_page_flag: '0',
+      attribute_template_key: 'default',
+      note: 'Yahooは後日開始',
+      publish_phase1: '1',
+      publish_rakuten: '1',
+      publish_yahoo: '0'
+    })
   ];
 }
 
-function applyGuideSheetFormat_(sheet, rowCount) {
-  sheet.setColumnWidths(1, 1, 180);
-  sheet.setColumnWidths(2, 1, 620);
-  sheet.setColumnWidths(3, 1, 240);
-  sheet.getRange(1, 1, rowCount, 3).setWrap(true).setVerticalAlignment('top');
-  sheet.getRange(1, 1, 2, 3).setBackground('#f4efe6');
-  sheet.getRange(1, 1, 1, 3).setFontWeight('bold').setFontSize(14);
+function buildSchemaRowFromObject_(valuesByKey) {
+  return PHASE1_INPUT_SCHEMA.map(function (item) {
+    return valuesByKey[item.key] || '';
+  });
+}
 
-  [4, 11, 32, 38].forEach(function (row) {
-    sheet.getRange(row, 1, 1, 3).setFontWeight('bold').setBackground('#d9ead3');
+function buildInputHeaderLabel_(item) {
+  return item.required ? `${item.label}（必須）` : item.label;
+}
+
+function applyInputSheetFormat_(sheet, columnCount) {
+  sheet.getRange(1, 1, 2, columnCount).setWrap(true).setVerticalAlignment('top');
+  sheet.getRange(1, 1, 1, columnCount).setFontWeight('bold');
+  applyInputBlockColors_(sheet, 1, 2);
+  applyInputBlockColors_(sheet, 3, 498);
+  sheet.autoResizeColumns(1, columnCount);
+}
+
+function applyInputBlockColors_(sheet, startRow, rowCount) {
+  const colors = startRow <= 2
+    ? ['#dbeafe', '#c7d2fe', '#bfdbfe', '#fff2cc']
+    : ['#f8fbff', '#f2f5ff', '#eff6ff', '#fffdf0'];
+
+  INPUT_BLOCKS.forEach(function (block, index) {
+    sheet.getRange(startRow, block.from, rowCount, block.to - block.from + 1).setBackground(colors[index]);
+  });
+}
+
+function populateGuideSheet_(sheet) {
+  setMergedValue_(sheet, 'A1:J2', 'CSV作成ガイド');
+  setMergedValue_(
+    sheet,
+    'A3:J4',
+    '入力は「中間入力」1枚でまとめて行い、その後に Phase1、楽天、Yahoo の確認用シートへ分かれます。出したい先だけ最後の3列を 1 にして、必要なCSVだけ作成します。'
+  );
+
+  setMergedValue_(sheet, 'A6:C8', '1. データ入力\n共通の中間入力へ入れる');
+  setMergedValue_(sheet, 'D6:D8', '→');
+  setMergedValue_(sheet, 'E6:G8', '2. 各確認用を更新\nPhase1 / 楽天 / Yahoo');
+  setMergedValue_(sheet, 'H6:H8', '→');
+  setMergedValue_(sheet, 'I6:J8', '3. 必要なCSVだけ作成\nir-item / itemsub');
+
+  setMergedValue_(sheet, 'A11:J11', '1. データ入力');
+  setMergedValue_(
+    sheet,
+    'A12:D27',
+    '青い欄はAIや元データを一気に貼る欄です。黄色い欄は人が確認して決める欄です。\n\n列のまとまりは次の4つです。\n・共通入力: 商品コード、共通商品名、価格、JAN、画像枚数など\n・楽天入力: 楽天用の商品名、説明文、販売説明文など\n・Yahoo入力: Yahoo用の商品名、説明文、スマホ自由欄など\n・確認と出力設定: 販売期間、配送番号、公開設定、publishフラグなど\n\n最後の3列は出力先のスイッチです。\n・publish_phase1 = ir-item.csv\n・publish_rakuten = ir-itemsub_楽天.csv\n・publish_yahoo = ir-itemsub_Yahoo.csv\n\n1行に1商品ずつ入れます。画像は白背景画像なしで、1 から image_count の枚数だけ自動生成します。'
+  );
+  setMergedValue_(sheet, 'E12:J12', '画面イメージ: 入力見本');
+  sheet.getRange('E13').setFormula("=ARRAY_CONSTRAIN('入力見本'!A5:F8,4,6)");
+  setMergedValue_(sheet, 'E19:J19', '画面イメージ: 中間入力');
+  sheet.getRange('E20').setFormula("=ARRAY_CONSTRAIN('中間入力'!A1:F4,4,6)");
+
+  setMergedValue_(sheet, 'A30:J30', '2. 各確認用を更新');
+  setMergedValue_(
+    sheet,
+    'A31:D48',
+    '入力後はメニューから確認用を更新します。\n\nPhase1の確認用では、共通データから ir-item.csv に入る内容を見ます。\n楽天確認用では、楽天専用の商品名、説明文、販売期間、送料設定などを見ます。\nYahoo確認用では、Yahoo専用の商品名、パス、ページ公開、配送グループなどを見ます。\n\nエラーが出たら、直す場所は必ず「中間入力」です。修正したあと、もう一度その確認用を更新してください。'
+  );
+  setMergedValue_(sheet, 'E31:J31', '画面イメージ: 確認用');
+  sheet.getRange('E32').setFormula("=ARRAY_CONSTRAIN('確認用'!A1:F4,4,6)");
+  setMergedValue_(sheet, 'E37:J37', '画面イメージ: 楽天確認用');
+  sheet.getRange('E38').setFormula("=ARRAY_CONSTRAIN('楽天確認用'!A1:F4,4,6)");
+  setMergedValue_(sheet, 'E43:J43', '画面イメージ: Yahoo確認用');
+  sheet.getRange('E44').setFormula("=ARRAY_CONSTRAIN('Yahoo確認用'!A1:F4,4,6)");
+
+  setMergedValue_(sheet, 'A51:J51', '3. CSVを作る');
+  setMergedValue_(
+    sheet,
+    'A52:D68',
+    '確認用を見て問題がなければ、必要なCSVだけ書き出します。\n\n出力条件は先ごとに別です。\n・Phase1: publish_phase1 = 1 でエラーなし\n・楽天: publish_rakuten = 1 でエラーなし\n・Yahoo: publish_yahoo = 1 でエラーなし\n\nCSVはこのパソコンにダウンロードされます。ブラウザの確認が出たら保存を許可してください。'
+  );
+  setMergedValue_(sheet, 'E52:J52', 'メニュー例');
+  setMergedValue_(
+    sheet,
+    'E53:J58',
+    'Phase1\n・シートを初期化\n・Phase2用シートを初期化\n・説明書と見本を更新\n・Phase1の確認用を更新\n・楽天確認用を更新\n・Yahoo確認用を更新'
+  );
+  setMergedValue_(sheet, 'E60:J60', '出力されるファイル');
+  setMergedValue_(
+    sheet,
+    'E61:J66',
+    'ir-item_20260405_090000.csv\nir-itemsub_楽天_20260405_090000.csv\nir-itemsub_Yahoo_20260405_090000.csv\nphase1_intermediate_20260405_090000.csv'
+  );
+
+  setMergedValue_(sheet, 'A71:J71', 'publishフラグの使い分け');
+  setMergedValue_(sheet, 'A72:C75', 'publish_phase1');
+  setMergedValue_(sheet, 'D72:J75', '共通の ir-item.csv を出したいときに 1 を入れます。楽天やYahooを出さなくても、ここだけ 1 にできます。');
+  setMergedValue_(sheet, 'A76:C79', 'publish_rakuten');
+  setMergedValue_(sheet, 'D76:J79', '楽天 itemsub を出したいときに 1 を入れます。楽天用の名前や説明文が未入力でも、共通の値で補えるところは補います。');
+  setMergedValue_(sheet, 'A80:C83', 'publish_yahoo');
+  setMergedValue_(sheet, 'D80:J83', 'Yahoo itemsub を出したいときに 1 を入れます。Yahoo用のページIDやパスは、空欄なら共通の値を土台にします。');
+
+  setMergedValue_(sheet, 'A86:J86', '困ったとき');
+  setMergedValue_(sheet, 'A87:C90', '楽天だけ止まる');
+  setMergedValue_(sheet, 'D87:J90', '「楽天エラー一覧」を見てください。販売期間、送料、配送番号など、楽天専用の欄で止まることがあります。');
+  setMergedValue_(sheet, 'A91:C94', 'Yahooだけ止まる');
+  setMergedValue_(sheet, 'D91:J94', '「Yahooエラー一覧」を見てください。パス、ページID、配送グループ番号、公開設定などを確認します。');
+  setMergedValue_(sheet, 'A95:C98', '何も出ない');
+  setMergedValue_(sheet, 'D95:J98', '対象の publish 列が 1 になっているか、各エラー一覧に理由が出ていないかを確認してください。');
+}
+
+function applyGuideSheetFormat_(sheet) {
+  const totalRows = 98;
+  const totalColumns = 10;
+  sheet.getRange(1, 1, totalRows, totalColumns).setWrap(true).setVerticalAlignment('top');
+
+  for (let column = 1; column <= 4; column += 1) {
+    sheet.setColumnWidth(column, 145);
+  }
+  for (let column = 5; column <= 10; column += 1) {
+    sheet.setColumnWidth(column, 110);
+  }
+
+  sheet.getRange('A1:J2').setBackground('#f4efe6').setFontWeight('bold').setFontSize(16).setHorizontalAlignment('center').setVerticalAlignment('middle');
+  sheet.getRange('A3:J4').setBackground('#fff9ef');
+  sheet.getRange('A6:C8').setBackground('#d9ead3').setFontWeight('bold').setHorizontalAlignment('center').setVerticalAlignment('middle').setBorder(true, true, true, true, true, true);
+  sheet.getRange('D6:D8').setFontSize(18).setFontWeight('bold').setHorizontalAlignment('center').setVerticalAlignment('middle');
+  sheet.getRange('E6:G8').setBackground('#cfe2f3').setFontWeight('bold').setHorizontalAlignment('center').setVerticalAlignment('middle').setBorder(true, true, true, true, true, true);
+  sheet.getRange('H6:H8').setFontSize(18).setFontWeight('bold').setHorizontalAlignment('center').setVerticalAlignment('middle');
+  sheet.getRange('I6:J8').setBackground('#fce5cd').setFontWeight('bold').setHorizontalAlignment('center').setVerticalAlignment('middle').setBorder(true, true, true, true, true, true);
+
+  ['A11:J11', 'A30:J30', 'A51:J51', 'A71:J71', 'A86:J86'].forEach(function (a1) {
+    sheet.getRange(a1).setBackground('#b6d7a8').setFontWeight('bold').setFontSize(12);
   });
 
-  [3, 10, 31, 37].forEach(function (row) {
-    sheet.getRange(row, 1, 1, 3).setBackground('#ffffff');
+  ['A12:D27', 'A31:D48', 'A52:D68'].forEach(function (a1) {
+    sheet.getRange(a1).setBackground('#f8fbf4').setBorder(true, true, true, true, true, true);
   });
+
+  ['E12:J12', 'E19:J19', 'E31:J31', 'E37:J37', 'E43:J43', 'E52:J52', 'E60:J60'].forEach(function (a1) {
+    sheet.getRange(a1).setBackground('#ddebf7').setFontWeight('bold').setHorizontalAlignment('center').setBorder(true, true, true, true, true, true);
+  });
+
+  ['E13:J16', 'E20:J23', 'E32:J35', 'E38:J41', 'E44:J47'].forEach(function (a1) {
+    sheet.getRange(a1).setBackground('#ffffff').setBorder(true, true, true, true, true, true).setFontSize(9);
+  });
+
+  ['E53:J58', 'E61:J66', 'A72:C75', 'D72:J75', 'A76:C79', 'D76:J79', 'A80:C83', 'D80:J83', 'A87:C90', 'D87:J90', 'A91:C94', 'D91:J94', 'A95:C98', 'D95:J98'].forEach(function (a1) {
+    sheet.getRange(a1).setBackground('#fffdf0').setBorder(true, true, true, true, true, true);
+  });
+
+  ['A72:C75', 'A76:C79', 'A80:C83', 'A87:C90', 'A91:C94', 'A95:C98'].forEach(function (a1) {
+    sheet.getRange(a1).setFontWeight('bold').setHorizontalAlignment('center').setVerticalAlignment('middle');
+  });
+
+  for (let row = 1; row <= totalRows; row += 1) {
+    sheet.setRowHeight(row, row <= 4 ? 28 : 24);
+  }
+}
+
+function applySampleSheetFormat_(sheet, rowCount, columnCount) {
+  sheet.getRange(1, 1, rowCount, columnCount).setWrap(true).setVerticalAlignment('top');
+  sheet.getRange(1, 1, 3, columnCount).setBackground('#f4efe6');
+  sheet.getRange(1, 1, 1, columnCount).setFontWeight('bold').setFontSize(14);
+  sheet.getRange(5, 1, 1, columnCount).setFontWeight('bold');
+  applySampleBlockColors_(sheet, 5, 4);
+  sheet.autoResizeColumns(1, columnCount);
+}
+
+function applySampleBlockColors_(sheet, startRow, rowCount) {
+  const colors = ['#dbeafe', '#c7d2fe', '#bfdbfe', '#fff2cc'];
+  INPUT_BLOCKS.forEach(function (block, index) {
+    sheet.getRange(startRow, block.from, rowCount, block.to - block.from + 1).setBackground(colors[index]);
+  });
+}
+
+function setMergedValue_(sheet, a1, value) {
+  const range = sheet.getRange(a1);
+  range.merge();
+  range.setValue(value);
+  return range;
+}
+
+function buildBlankMatrix_(rowCount, columnCount) {
+  const rows = [];
+  for (let row = 0; row < rowCount; row += 1) {
+    rows.push(new Array(columnCount).fill(''));
+  }
+  return rows;
 }
 
 function getOrCreateSheet_(sheetName, ss) {
@@ -395,18 +585,66 @@ function getActiveSpreadsheet_() {
   return ss;
 }
 
-function createEmptyIrItemRow_() {
-  return IR_ITEM_HEADER.reduce(function (row, header) {
+function createEmptyRowFromHeader_(headerRow) {
+  return headerRow.reduce(function (row, header) {
     row[header] = '';
     return row;
   }, {});
+}
+
+function appendDuplicateProductCodeErrorsByPublishFlag_(records) {
+  const buckets = {};
+
+  records.forEach(function (record) {
+    if (!record.normalized.productCode || record.normalized.publishFlag !== '1') {
+      return;
+    }
+    if (!buckets[record.normalized.productCode]) {
+      buckets[record.normalized.productCode] = [];
+    }
+    buckets[record.normalized.productCode].push(record);
+  });
+
+  Object.keys(buckets).forEach(function (productCode) {
+    if (buckets[productCode].length <= 1) {
+      return;
+    }
+
+    buckets[productCode].forEach(function (record) {
+      record.errors.push(buildError_('product_code', 'DUPLICATE_PRODUCT_CODE', `product_code が重複しています: ${productCode}`));
+      record.shouldExport = false;
+    });
+  });
+}
+
+function buildErrorRowsFromRecords_(records, schema, publishKey) {
+  const rows = [schema];
+  records.forEach(function (record) {
+    record.errors.forEach(function (error) {
+      rows.push([
+        record.sourceRowNumber,
+        error.field,
+        error.code,
+        error.message,
+        record.source[publishKey] || '',
+        record.normalized.productCode || ''
+      ]);
+    });
+  });
+  return rows;
+}
+
+function buildErrorMessages_(errors) {
+  return errors.map(function (error) {
+    return `[${error.code}] ${error.message}`;
+  }).join('\n');
 }
 
 function normalizeProductCode_(value, errors) {
   let productCode = trimToString_(value);
 
   if (!productCode) {
-    errors.push(buildError_('product_code', 'REQUIRED', 'product_code または product_code_seed が必要です。'));
+    errors.push(buildError_('product_code', 'REQUIRED', '商品コードを入力してください。'));
     return '';
   }
 
@@ -420,179 +658,300 @@ function normalizeProductCode_(value, errors) {
     .replace(/^[-_]+|[-_]+$/g, '');
 
   if (!productCode) {
-    errors.push(buildError_('product_code', 'INVALID', 'product_code が空になりました。許可文字のみで入力してください。'));
+    errors.push(buildError_('product_code', 'INVALID', '商品コードが空になりました。英小文字、数字、-、_ のみになるように直してください。'));
     return '';
   }
 
-  if (!/^[0-9a-z_-]+$/.test(productCode)) {
-    errors.push(buildError_('product_code', 'INVALID', 'product_code は英小文字、数字、-、_ のみ使用できます。'));
-  }
-
   if (productCode.length > PHASE1_CONFIG.maxProductCodeLength) {
-    errors.push(buildError_('product_code', 'TOO_LONG', `product_code は ${PHASE1_CONFIG.maxProductCodeLength} 文字以内で入力してください。`));
+    errors.push(buildError_('product_code', 'TOO_LONG', `商品コードは ${PHASE1_CONFIG.maxProductCodeLength} 文字以内で入力してください。`));
   }
 
   return productCode;
 }
 
 function resolveTitle_(source, errors) {
-  const title = trimToString_(source.final_title_override) ||
-    trimToString_(source.ai_title) ||
-    trimToString_(source.raw_name);
-
+  const title = trimToString_(source.title);
   if (!title) {
-    errors.push(buildError_('title', 'REQUIRED', '商品名を決定できません。raw_name / ai_title / final_title_override を確認してください。'));
+    errors.push(buildError_('title', 'REQUIRED', '共通の商品名を入力してください。'));
     return '';
   }
-
   if (title.length > PHASE1_CONFIG.maxProductNameLength) {
-    errors.push(buildError_('title', 'TOO_LONG', `商品名は ${PHASE1_CONFIG.maxProductNameLength} 文字以内で入力してください。`));
+    errors.push(buildError_('title', 'TOO_LONG', `共通の商品名は ${PHASE1_CONFIG.maxProductNameLength} 文字以内で入力してください。`));
   }
+  return title;
+}
 
+function resolveMallTitle_(specificValue, fallbackValue, fieldName, label, errors) {
+  const title = trimToString_(specificValue) || trimToString_(fallbackValue);
+  if (!title) {
+    errors.push(buildError_(fieldName, 'REQUIRED', `${label}を入力してください。`));
+    return '';
+  }
+  if (title.length > PHASE1_CONFIG.maxProductNameLength) {
+    errors.push(buildError_(fieldName, 'TOO_LONG', `${label}は ${PHASE1_CONFIG.maxProductNameLength} 文字以内で入力してください。`));
+  }
   return title;
 }
 
 function normalizeCategory_(value, errors) {
-  const rawValue = trimToString_(value);
-  const ids = rawValue.match(/\d+/g) || [];
+  return normalizeCategoryLike_(value, 'category', '共通カテゴリ', true, errors);
+}
 
+function normalizeCategoryLike_(value, fieldName, label, required, errors) {
+  const rawValue = trimToString_(value);
+  if (!rawValue) {
+    if (required) {
+      errors.push(buildError_(fieldName, 'REQUIRED', `${label}を入力してください。`));
+    }
+    return '';
+  }
+
+  const ids = rawValue.match(/\d+/g) || [];
   if (ids.length === 0) {
-    errors.push(buildError_('category_id_final', 'REQUIRED', 'category_id_final にカテゴリIDを入力してください。'));
+    errors.push(buildError_(fieldName, 'INVALID', `${label}は数字だけ、または 683|530 のように入力してください。`));
     return '';
   }
 
   return `|${ids.join('|')}|`;
 }
 
-function resolveSalePrice_(salePrice, suggestedPrice, errors) {
-  const rawValue = trimToString_(salePrice) || trimToString_(suggestedPrice);
+function normalizeRakutenGenreId_(value, errors) {
+  return normalizeDigitsField_(value, 'rakuten_genre_id', '楽天ジャンルID', errors, {
+    required: true,
+    maxDigits: 20
+  });
+}
 
-  if (!rawValue) {
-    errors.push(buildError_('sale_price', 'REQUIRED', 'sale_price または price_suggested が必要です。'));
-    return '';
-  }
+function normalizeYahooProductCategory_(value, errors) {
+  return normalizeDigitsField_(value, 'yahoo_product_category', 'Yahoo productカテゴリ', errors, {
+    required: true,
+    maxDigits: 10
+  });
+}
 
-  if (!/^\d+$/.test(rawValue)) {
-    errors.push(buildError_('sale_price', 'INVALID', '販売価格は半角数字のみで入力してください。'));
-    return rawValue;
-  }
-
-  if (rawValue.length > PHASE1_CONFIG.maxPriceDigits) {
-    errors.push(buildError_('sale_price', 'TOO_LONG', `販売価格は ${PHASE1_CONFIG.maxPriceDigits} 桁以内で入力してください。`));
-  }
-
-  return rawValue;
+function resolveSalePrice_(salePrice, errors) {
+  return normalizeDigitsField_(salePrice, 'sale_price', '販売価格', errors, {
+    required: true,
+    maxDigits: PHASE1_CONFIG.maxPriceDigits
+  });
 }
 
 function resolveDisplayPrice_(salePrice) {
-  if (!salePrice) {
-    return '';
-  }
-  if (PHASE1_CONFIG.displayPriceMode === 'same_as_sale_price') {
-    return salePrice;
-  }
-  return salePrice;
+  return salePrice || '';
 }
 
 function resolveTaxRule_(value, errors) {
-  const rawValue = trimToString_(value).toLowerCase();
-
+  const rawValue = trimToString_(value);
   if (!rawValue) {
+    errors.push(buildError_('food_flag', 'REQUIRED', '食品フラグを入力してください。1=食品、0=非食品です。'));
     return TAX_CLASS_RULES[PHASE1_CONFIG.defaultTaxClass];
   }
-
-  if (['standard', 'normal', '10', '10%', '0'].indexOf(rawValue) >= 0) {
+  if (rawValue === '0') {
     return TAX_CLASS_RULES.standard;
   }
-  if (['reduced', 'food', '8', '8%', '1'].indexOf(rawValue) >= 0) {
+  if (rawValue === '1') {
     return TAX_CLASS_RULES.reduced;
   }
-
-  errors.push(buildError_('tax_class', 'INVALID', 'tax_class は standard / reduced / 10 / 8 系の値で入力してください。'));
+  errors.push(buildError_('food_flag', 'INVALID', '食品フラグは 1=食品、0=非食品 で入力してください。'));
   return TAX_CLASS_RULES[PHASE1_CONFIG.defaultTaxClass];
 }
 
-function normalizeZeroOneField_(value, defaultValue, field, errors) {
-  const rawValue = trimToString_(value);
-  if (!rawValue) {
-    return defaultValue;
-  }
-  if (rawValue === '0' || rawValue === '1') {
-    return rawValue;
-  }
-  errors.push(buildError_(field, 'INVALID', `${field} は 0 または 1 で入力してください。`));
-  return defaultValue;
+function normalizeJanCode_(value, errors) {
+  return normalizeDigitsField_(value, 'jan_code', 'JANコード', errors, {
+    required: false,
+    maxDigits: 13
+  });
 }
 
-function normalizeJanCode_(value, errors) {
+function normalizeDigitsField_(value, fieldName, label, errors, options) {
+  const settings = options || {};
+  const rawValue = trimToString_(value);
+
+  if (!rawValue) {
+    if (settings.required) {
+      errors.push(buildError_(fieldName, 'REQUIRED', `${label}を入力してください。`));
+    }
+    return settings.defaultValue || '';
+  }
+
+  if (!/^\d+$/.test(rawValue)) {
+    errors.push(buildError_(fieldName, 'INVALID', `${label}は数字だけで入力してください。`));
+    return rawValue;
+  }
+
+  if (settings.maxDigits && rawValue.length > settings.maxDigits) {
+    errors.push(buildError_(fieldName, 'TOO_LONG', `${label}は ${settings.maxDigits} 桁以内で入力してください。`));
+  }
+
+  return rawValue;
+}
+
+function normalizeChoiceField_(value, fieldName, label, errors, allowedValues, options) {
+  const settings = options || {};
+  const rawValue = trimToString_(value);
+
+  if (!rawValue) {
+    return settings.defaultValue || '';
+  }
+
+  if (allowedValues.indexOf(rawValue) === -1) {
+    errors.push(buildError_(fieldName, 'INVALID', `${label}は ${allowedValues.join('/')} のいずれかで入力してください。`));
+    return rawValue;
+  }
+
+  return rawValue;
+}
+
+function normalizeRakutenSalePeriod_(value, fieldName, label, errors) {
   const rawValue = trimToString_(value);
   if (!rawValue) {
     return '';
   }
-  if (!/^\d+$/.test(rawValue)) {
-    errors.push(buildError_('jan_code', 'INVALID', 'JAN コードは半角数字のみで入力してください。'));
+  if (!/^\d{12}$/.test(rawValue)) {
+    errors.push(buildError_(fieldName, 'INVALID', `${label}は YYYYMMDDHHMM の 12 桁で入力してください。`));
   }
   return rawValue;
 }
 
-function buildImageBundle_(productCode, imageCountValue, imageExtValue, hasWhiteImageValue, errors) {
+function normalizeYahooPath_(value, fallbackValue, errors) {
+  const rawValue = trimToString_(value) || trimToString_(fallbackValue);
+  return normalizeCategoryLike_(rawValue, 'yahoo_path', 'Yahooのパス', true, errors);
+}
+
+function buildImageBundle_(productCode, imageCountValue, imageExtValue, errors) {
   const imageCountText = trimToString_(imageCountValue);
   const imageExt = trimToString_(imageExtValue).replace(/^\./, '').toLowerCase();
-  const hasWhiteImage = normalizeZeroOneField_(hasWhiteImageValue, '0', 'has_white_image', errors);
   const urls = [];
 
   if (!productCode) {
-    return { urls: urls, hasWhiteImage: hasWhiteImage };
+    return { urls: urls };
   }
 
   if (!imageCountText) {
-    errors.push(buildError_('image_count', 'REQUIRED', 'image_count が必要です。'));
-    return { urls: urls, hasWhiteImage: hasWhiteImage };
+    errors.push(buildError_('image_count', 'REQUIRED', '画像枚数を入力してください。'));
+    return { urls: urls };
   }
 
   if (!/^\d+$/.test(imageCountText)) {
-    errors.push(buildError_('image_count', 'INVALID', 'image_count は 0-20 の整数で入力してください。'));
-    return { urls: urls, hasWhiteImage: hasWhiteImage };
+    errors.push(buildError_('image_count', 'INVALID', '画像枚数は 0 から 20 の整数で入力してください。'));
+    return { urls: urls };
   }
 
   if (!imageExt) {
-    errors.push(buildError_('image_ext', 'REQUIRED', 'image_ext が必要です。'));
-    return { urls: urls, hasWhiteImage: hasWhiteImage };
+    errors.push(buildError_('image_ext', 'REQUIRED', '画像の種類を入力してください。'));
+    return { urls: urls };
   }
 
   if (!/^[a-z0-9]+$/.test(imageExt)) {
-    errors.push(buildError_('image_ext', 'INVALID', 'image_ext は拡張子のみを入力してください。'));
+    errors.push(buildError_('image_ext', 'INVALID', '画像の種類は jpg や png のように拡張子だけを入力してください。'));
   }
 
   const imageCount = Number(imageCountText);
   if (imageCount < 0 || imageCount > PHASE1_CONFIG.maxImageSlots) {
-    errors.push(buildError_('image_count', 'OUT_OF_RANGE', `image_count は 0-${PHASE1_CONFIG.maxImageSlots} で入力してください。`));
-    return { urls: urls, hasWhiteImage: hasWhiteImage };
-  }
-
-  if (hasWhiteImage === '1' && imageCount >= PHASE1_CONFIG.maxImageSlots) {
-    errors.push(buildError_('image_count', 'WHITE_IMAGE_OVERFLOW', 'has_white_image = 1 の場合、image_count は 19 以下で入力してください。'));
-    return { urls: urls, hasWhiteImage: hasWhiteImage };
+    errors.push(buildError_('image_count', 'OUT_OF_RANGE', `画像枚数は 0 から ${PHASE1_CONFIG.maxImageSlots} の間で入力してください。`));
+    return { urls: urls };
   }
 
   for (let i = 1; i <= imageCount; i += 1) {
     urls.push(`${PHASE1_CONFIG.imageBaseUrl}${productCode}/${i}.${imageExt}`);
   }
-  if (hasWhiteImage === '1') {
-    urls.push(`${PHASE1_CONFIG.imageBaseUrl}${productCode}/w.${imageExt}`);
-  }
 
-  return {
-    urls: urls,
-    hasWhiteImage: hasWhiteImage
-  };
+  return { urls: urls };
 }
 
-function createCsvFile_(fileName, rows, charset) {
-  const csvText = rows.map(toCsvLine_).join('\r\n');
+function validateAttributeDependency_(source, normalized, errors) {
+  if (trimToString_(source.attribute_template_key) && !normalized.rakutenGenreId) {
+    errors.push(buildError_('rakuten_genre_id', 'REQUIRED', '属性テンプレート名を使う場合は楽天ジャンルIDが必要です。'));
+  }
+}
+
+function downloadCsvFile_(fileName, rows, charset) {
+  const blob = createCsvBlob_(fileName, rows, charset);
+  const html = HtmlService.createHtmlOutput(buildCsvDownloadDialogHtml_(fileName, blob))
+    .setWidth(420)
+    .setHeight(220);
+
+  SpreadsheetApp.getUi().showModalDialog(html, 'CSV をダウンロード');
+}
+
+function createCsvBlob_(fileName, rows, charset) {
+  const csvText = buildCsvText_(rows);
   const blob = Utilities.newBlob('', 'text/csv', fileName);
   blob.setDataFromString(csvText, charset);
-  DriveApp.createFile(blob);
+  return blob;
+}
+
+function buildCsvText_(rows) {
+  return rows.map(toCsvLine_).join('\r\n');
+}
+
+function buildCsvDownloadDialogHtml_(fileName, blob) {
+  const payload = JSON.stringify({
+    fileName: fileName,
+    base64: Utilities.base64Encode(blob.getBytes()),
+    mimeType: blob.getContentType() || 'text/csv'
+  });
+
+  return `
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <style>
+      body { font-family: sans-serif; padding: 16px; line-height: 1.6; }
+      .box { border: 1px solid #d9d9d9; border-radius: 8px; padding: 16px; background: #fafafa; }
+      .title { font-weight: 700; margin-bottom: 8px; }
+      .sub { color: #555; font-size: 13px; }
+      .button { display: inline-block; margin-top: 12px; padding: 8px 14px; background: #1a73e8; color: #fff; text-decoration: none; border-radius: 6px; }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <div class="title">CSV のダウンロードを開始します</div>
+      <div id="status" class="sub">ブラウザの確認が出たら、保存を許可してください。</div>
+      <a id="manualDownload" class="button" href="#">もう一度ダウンロードする</a>
+    </div>
+    <script>
+      const payload = ${payload};
+
+      function decodeBase64(base64) {
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes;
+      }
+
+      function triggerDownload() {
+        const bytes = decodeBase64(payload.base64);
+        const blob = new Blob([bytes], { type: payload.mimeType });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = payload.fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        setTimeout(function () {
+          URL.revokeObjectURL(url);
+        }, 1000);
+      }
+
+      document.getElementById('manualDownload').addEventListener('click', function(event) {
+        event.preventDefault();
+        triggerDownload();
+      });
+
+      window.addEventListener('load', function() {
+        triggerDownload();
+        document.getElementById('status').textContent = 'ダウンロードを開始しました。保存先はブラウザの設定により変わります。';
+      });
+    </script>
+  </body>
+</html>`;
 }
 
 function toCsvLine_(row) {

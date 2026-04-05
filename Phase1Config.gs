@@ -1,9 +1,22 @@
 const PHASE1_CONFIG = Object.freeze({
   sheetNames: Object.freeze({
     guide: '使い方',
+    sample: '入力見本',
     input: '中間入力',
     review: '確認用',
-    errors: 'エラー一覧'
+    errors: 'エラー一覧',
+    rakutenReview: '楽天確認用',
+    rakutenErrors: '楽天エラー一覧',
+    yahooReview: 'Yahoo確認用',
+    yahooErrors: 'Yahooエラー一覧'
+  }),
+  mallSettings: Object.freeze({
+    rakuten: Object.freeze({
+      shopName: '楽天店'
+    }),
+    yahoo: Object.freeze({
+      shopName: 'Yahoo店'
+    })
   }),
   imageBaseUrl: 'http://r-asp02.item-robot.com/upload/images/1681/',
   displayPriceMode: 'same_as_sale_price',
@@ -18,7 +31,9 @@ const PHASE1_CONFIG = Object.freeze({
   defaultPcSalesCopyLineBreak: '0',
   exportEncoding: Object.freeze({
     intermediate: 'UTF-8',
-    irItem: 'Shift_JIS'
+    irItem: 'Shift_JIS',
+    rakutenItemsub: 'Shift_JIS',
+    yahooItemsub: 'Shift_JIS'
   }),
   maxProductCodeLength: 32,
   maxProductNameLength: 127,
