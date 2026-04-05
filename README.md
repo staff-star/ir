@@ -72,6 +72,17 @@
 - 楽天の固定値は `Phase1Config.gs` の `mallSettings.rakuten.defaults`
 - Yahoo の固定値は `Phase1Config.gs` の `mallSettings.yahoo.defaults`
 
+## Yahoo itemsub の回収点
+- `商品コード` は Yahoo itemsub では空欄で出力します
+- `yahooプロダクトカテゴリ` は Yahoo itemsub では空欄で出力します
+- `通常販売価格` は Yahoo itemsub では空欄で出力します
+- `JANコード/ISBNコード` は Yahoo itemsub では空欄で出力します
+- 上記4項目は ir-item 側で管理する前提です
+- `商品説明` は `yahoo_desc` 優先で出力します
+- `フリースペース（スマホのみ）` は `yahoo_sp_free` を出力します
+- 改行フラグは `0` 固定です
+- `在庫あり時の表示文言` は main では運用しません。列が存在する場合も空欄で出力します
+
 ## publish フラグ
 - `publish_phase1 = 1` の行だけ `ir-item.csv` の対象
 - `publish_rakuten = 1` の行だけ `ir-itemsub_楽天.csv` の対象

@@ -52,23 +52,23 @@ function buildYahooItemsubRecord_(source, sourceRowNumber) {
   normalized.mainProductCode = normalizeProductCode_(source.product_code, errors);
   normalized.mainTitle = resolveTitle_(source, errors);
   normalized.shopName = PHASE1_CONFIG.mallSettings.yahoo.shopName;
-  normalized.productCode = normalized.mainProductCode;
+  normalized.productCode = '';
   normalized.path = normalizeOptionalYahooPath_(defaults.path, errors);
-  normalized.yahooProductCategory = normalizeYahooProductCategory_(source.yahoo_product_category, errors);
+  normalized.yahooProductCategory = '';
   normalized.title = resolveMallTitle_(source.yahoo_title, source.title, 'yahoo_title', 'Yahooの商品名', errors);
   normalized.catchcopy = trimToString_(source.yahoo_catchcopy) || trimToString_(source.ai_catchcopy);
-  normalized.salePrice = resolveSalePrice_(source.sale_price, errors);
+  normalized.salePrice = '';
   normalized.productInfo = '';
   normalized.description = trimToString_(source.yahoo_desc) || trimToString_(source.ai_description_material);
   normalized.spFree = trimToString_(source.yahoo_sp_free);
-  normalized.janCode = normalizeJanCode_(source.jan_code, errors);
+  normalized.janCode = '';
   normalized.uploadTargetFlag = normalizeChoiceField_(defaults.uploadTargetFlag, 'yahoo_upload_target_flag', 'Yahooのアップロード対象', errors, ['0', '1'], { defaultValue: '' });
   normalized.hiddenPageFlag = normalizeChoiceField_(defaults.hiddenPageFlag, 'yahoo_hidden_page_flag', 'Yahooの隠しページ設定', errors, ['0', '1'], { defaultValue: '0' });
   normalized.pageOpenFlag = trimToString_(defaults.pageOpenFlag);
   normalized.pointRateType = defaults.pointRateType;
   normalized.pointRate = defaults.pointRate;
   normalized.allowOverOrder = defaults.allowOverOrder;
-  normalized.stockLeadMessage = defaults.stockLeadMessage;
+  normalized.stockLeadMessage = '';
   normalized.shippingGroupId = normalizeDigitsField_(
     source.yahoo_shipping_group_id || defaults.defaultShippingGroupId,
     'yahoo_shipping_group_id',

@@ -129,14 +129,20 @@ function runPhase1Tests() {
   assertEquals_('sample-product', yahooRecord.itemsubRow['メインデータの商品コード（楽天URL）'], 'Yahoo 先頭1列');
   assertEquals_('共通商品名', yahooRecord.itemsubRow['メインデータの商品名'], 'Yahoo 先頭2列');
   assertEquals_('美味セレクト Yahoo店', yahooRecord.itemsubRow['ショップ名'], 'Yahoo 先頭3列');
+  assertEquals_('', yahooRecord.itemsubRow['商品コード'], 'Yahoo 商品コードは空欄');
+  assertEquals_('', yahooRecord.itemsubRow['yahooプロダクトカテゴリ'], 'Yahoo カテゴリは空欄');
+  assertEquals_('', yahooRecord.itemsubRow['通常販売価格'], 'Yahoo 通常販売価格は空欄');
+  assertEquals_('', yahooRecord.itemsubRow['JANコード/ISBNコード'], 'Yahoo JANは空欄');
   assertEquals_('0', yahooRecord.itemsubRow['隠しページ設定'], 'Yahoo 隠しページ設定');
   assertEquals_('', yahooRecord.itemsubRow['ページ公開'], 'Yahoo ページ公開');
+  assertEquals_('', yahooRecord.itemsubRow['在庫あり時の表示文言'], 'Yahoo 在庫あり時の表示文言は空欄');
   assertEquals_('0', yahooRecord.itemsubRow['商品情報改行フラグ'], 'Yahoo 商品情報改行');
   assertEquals_('0', yahooRecord.itemsubRow['商品説明改行フラグ'], 'Yahoo 商品説明改行');
   assertEquals_('0', yahooRecord.itemsubRow['フリースペース（スマホのみ）改行フラグ'], 'Yahoo フリースペース改行');
   assertEquals_('1', yahooRecord.itemsubRow['ポイント倍率設定区分'], 'Yahoo ポイント区分');
   assertEquals_('0', yahooRecord.itemsubRow['商品別ポイント倍率'], 'Yahoo ポイント倍率');
   assertEquals_('0', yahooRecord.itemsubRow['在庫数を超えた注文'], 'Yahoo 在庫超過');
+  assertEquals_('2', yahooRecord.itemsubRow['配送グループ管理番号'], 'Yahoo 配送グループ');
   assertEquals_(0, yahooRecord.errors.length, 'Yahoo record errors');
 
   assertEquals_(393, IR_ITEM_HEADER.length, 'ir-item ヘッダ数');
