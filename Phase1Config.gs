@@ -3,6 +3,7 @@ const PHASE1_CONFIG = Object.freeze({
     guide: '使い方',
     sample: '入力見本',
     input: '中間入力',
+    rakutenAttributeTemplate: '楽天商品属性テンプレート',
     review: '確認用',
     errors: 'エラー一覧',
     rakutenReview: '楽天確認用',
@@ -12,24 +13,40 @@ const PHASE1_CONFIG = Object.freeze({
   }),
   mallSettings: Object.freeze({
     rakuten: Object.freeze({
-      shopName: '楽天店',
+      shopName: '美味セレクト楽天市場店',
       defaults: Object.freeze({
+        uploadTargetFlag: '1',
         saleStart: '',
         saleEnd: '',
+        defaultDisplayPriceMode: 'same_as_sale_price',
+        defaultDoublePriceTextMode: '',
+        stockReturnFlag: '0',
         stockLeadTime: '',
         outOfStockLeadTime: '',
+        deliveryLeadTime: '自社出荷/RSL',
         stockManagementId: '',
-        searchVisibleFlag: '',
-        doublePriceText: ''
+        searchVisibleFlag: '1',
+        pageTemplate: '1',
+        headerFooterLeftNavi: '自動選択',
+        displayOrder: '自動選択',
+        commonDescSmall: '自動選択',
+        commonDescLarge: '自動選択',
+        catalogIdNoneReason: ''
       })
     }),
     yahoo: Object.freeze({
-      shopName: 'Yahoo店',
+      shopName: '美味セレクト Yahoo店',
       defaults: Object.freeze({
         path: '',
         pageCode: '',
+        pageOpenFlag: '',
         uploadTargetFlag: '',
-        hiddenPageFlag: ''
+        hiddenPageFlag: '0',
+        pointRateType: '1',
+        pointRate: '0',
+        allowOverOrder: '0',
+        defaultShippingGroupId: '',
+        stockLeadMessage: '在庫あり'
       })
     })
   }),

@@ -49,41 +49,58 @@ function buildYahooItemsubRecord_(source, sourceRowNumber) {
   const defaults = PHASE1_CONFIG.mallSettings.yahoo.defaults;
 
   normalized.publishFlag = normalizePublishFlag_(source.publish_yahoo);
-  normalized.productCode = normalizeProductCode_(source.product_code, errors);
-  normalized.pageCode = normalizeOptionalYahooPageCode_(defaults.pageCode, errors);
+  normalized.mainProductCode = normalizeProductCode_(source.product_code, errors);
+  normalized.mainTitle = resolveTitle_(source, errors);
+  normalized.shopName = PHASE1_CONFIG.mallSettings.yahoo.shopName;
+  normalized.productCode = normalized.mainProductCode;
   normalized.path = normalizeOptionalYahooPath_(defaults.path, errors);
   normalized.yahooProductCategory = normalizeYahooProductCategory_(source.yahoo_product_category, errors);
   normalized.title = resolveMallTitle_(source.yahoo_title, source.title, 'yahoo_title', 'Yahooの商品名', errors);
   normalized.catchcopy = trimToString_(source.yahoo_catchcopy) || trimToString_(source.ai_catchcopy);
   normalized.salePrice = resolveSalePrice_(source.sale_price, errors);
-  normalized.tax = resolveTaxRule_(source.food_flag, errors);
-  normalized.info = trimToString_(source.ai_description_material) || trimToString_(source.yahoo_desc);
+  normalized.productInfo = '';
   normalized.description = trimToString_(source.yahoo_desc) || trimToString_(source.ai_description_material);
   normalized.spFree = trimToString_(source.yahoo_sp_free);
   normalized.janCode = normalizeJanCode_(source.jan_code, errors);
-  normalized.hiddenPageFlag = normalizeChoiceField_(defaults.hiddenPageFlag, 'yahoo_hidden_page_flag', 'Yahooのページ非公開', errors, ['0', '1'], { defaultValue: '' });
   normalized.uploadTargetFlag = normalizeChoiceField_(defaults.uploadTargetFlag, 'yahoo_upload_target_flag', 'Yahooのアップロード対象', errors, ['0', '1'], { defaultValue: '' });
-  normalized.shippingGroupId = normalizeDigitsField_(source.yahoo_shipping_group_id, 'yahoo_shipping_group_id', 'Yahooの配送グループ番号', errors, { required: false, maxDigits: 2 });
+  normalized.hiddenPageFlag = normalizeChoiceField_(defaults.hiddenPageFlag, 'yahoo_hidden_page_flag', 'Yahooの隠しページ設定', errors, ['0', '1'], { defaultValue: '0' });
+  normalized.pageOpenFlag = trimToString_(defaults.pageOpenFlag);
+  normalized.pointRateType = defaults.pointRateType;
+  normalized.pointRate = defaults.pointRate;
+  normalized.allowOverOrder = defaults.allowOverOrder;
+  normalized.stockLeadMessage = defaults.stockLeadMessage;
+  normalized.shippingGroupId = normalizeDigitsField_(
+    source.yahoo_shipping_group_id || defaults.defaultShippingGroupId,
+    'yahoo_shipping_group_id',
+    'Yahooの配送グループ番号',
+    errors,
+    { required: false, maxDigits: 2 }
+  );
 
   const itemsubRow = createEmptyRowFromHeader_(YAHOO_ITEMSUB_HEADER);
-  itemsubRow['メインデータの商品コード（楽天URL）'] = normalized.productCode;
-  itemsubRow['ショップ名'] = PHASE1_CONFIG.mallSettings.yahoo.shopName;
-  itemsubRow['商品コード'] = normalized.pageCode;
+  itemsubRow['メインデータの商品コード（楽天URL）'] = normalized.mainProductCode;
+  itemsubRow['メインデータの商品名'] = normalized.mainTitle;
+  itemsubRow['ショップ名'] = normalized.shopName;
+  itemsubRow['商品コード'] = normalized.productCode;
   itemsubRow['パス'] = normalized.path;
   itemsubRow['yahooプロダクトカテゴリ'] = normalized.yahooProductCategory;
   itemsubRow['商品名'] = normalized.title;
   itemsubRow['キャッチコピー'] = normalized.catchcopy;
-  itemsubRow['消費税'] = normalized.tax.taxFlag;
   itemsubRow['通常販売価格'] = normalized.salePrice;
-  itemsubRow['商品情報'] = normalized.info;
-  itemsubRow['商品情報改行フラグ'] = normalized.info ? '1' : '0';
+  itemsubRow['商品情報'] = normalized.productInfo;
+  itemsubRow['商品情報改行フラグ'] = '0';
   itemsubRow['商品説明'] = normalized.description;
-  itemsubRow['商品説明改行フラグ'] = normalized.description ? '1' : '0';
+  itemsubRow['商品説明改行フラグ'] = '0';
   itemsubRow['フリースペース（スマホのみ）'] = normalized.spFree;
-  itemsubRow['フリースペース（スマホのみ）改行フラグ'] = normalized.spFree ? '1' : '0';
+  itemsubRow['フリースペース（スマホのみ）改行フラグ'] = '0';
   itemsubRow['JANコード/ISBNコード'] = normalized.janCode;
-  itemsubRow['ページ公開'] = normalized.hiddenPageFlag;
   itemsubRow['アップロード対象設定'] = normalized.uploadTargetFlag;
+  itemsubRow['隠しページ設定'] = normalized.hiddenPageFlag;
+  itemsubRow['ページ公開'] = normalized.pageOpenFlag;
+  itemsubRow['ポイント倍率設定区分'] = normalized.pointRateType;
+  itemsubRow['商品別ポイント倍率'] = normalized.pointRate;
+  itemsubRow['在庫数を超えた注文'] = normalized.allowOverOrder;
+  itemsubRow['在庫あり時の表示文言'] = normalized.stockLeadMessage;
   itemsubRow['配送グループ管理番号'] = normalized.shippingGroupId;
 
   return {
@@ -101,50 +118,26 @@ function buildYahooReviewRow_(record) {
     record.sourceRowNumber,
     record.source.publish_yahoo || '',
     record.shouldExport ? '1' : '0',
-    record.normalized.productCode || '',
-    record.normalized.pageCode || '',
-    record.normalized.title || '',
-    record.normalized.path || '',
-    record.source.yahoo_product_category || '',
-    record.normalized.yahooProductCategory || '',
-    record.source.sale_price || '',
-    record.normalized.salePrice || '',
-    record.source.yahoo_shipping_group_id || '',
-    record.normalized.shippingGroupId || '',
-    record.normalized.uploadTargetFlag || '',
-    record.normalized.hiddenPageFlag || '',
-    record.normalized.info || '',
-    record.normalized.description || '',
-    record.normalized.spFree || '',
+    record.normalized.mainProductCode || '',
+    record.normalized.mainTitle || '',
+    record.normalized.shopName || '',
+    itemsubValue_(record, '商品コード'),
+    itemsubValue_(record, 'パス'),
+    itemsubValue_(record, 'yahooプロダクトカテゴリ'),
+    itemsubValue_(record, '商品名'),
+    itemsubValue_(record, 'アップロード対象設定'),
+    itemsubValue_(record, '隠しページ設定'),
+    itemsubValue_(record, 'ページ公開'),
+    itemsubValue_(record, 'ポイント倍率設定区分'),
+    itemsubValue_(record, '商品別ポイント倍率'),
+    itemsubValue_(record, '在庫数を超えた注文'),
+    itemsubValue_(record, '在庫あり時の表示文言'),
+    itemsubValue_(record, '商品情報改行フラグ'),
+    itemsubValue_(record, '商品説明改行フラグ'),
+    itemsubValue_(record, 'フリースペース（スマホのみ）改行フラグ'),
     String(record.errors.length),
     buildErrorMessages_(record.errors)
   ];
-}
-
-function normalizeOptionalYahooPageCode_(value, errors) {
-  let pageCode = trimToString_(value);
-  if (!pageCode) {
-    return '';
-  }
-
-  pageCode = pageCode
-    .normalize('NFKC')
-    .toLowerCase()
-    .replace(/[　\s_]+/g, '-')
-    .replace(/[^0-9a-z-]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-+|-+$/g, '');
-
-  if (!pageCode) {
-    errors.push(buildError_('yahoo_page_code', 'INVALID', 'YahooのページIDが空になりました。英小文字、数字、- のみになるように直してください。'));
-    return '';
-  }
-
-  if (pageCode.length > 198) {
-    errors.push(buildError_('yahoo_page_code', 'TOO_LONG', 'YahooのページIDは 198 文字以内で入力してください。'));
-  }
-
-  return pageCode;
 }
 
 function normalizeOptionalYahooPath_(value, errors) {

@@ -1,9 +1,10 @@
 # item Robot Phase1 / Phase2 GAS
 
-`中間入力` は 1 枚のまま使い、出力先だけを Phase1 / 楽天 / Yahoo で分ける実装です。Phase2 は入力負荷を下げるため、人が入れる列を 29 列構成まで絞っています。
+`中間入力` は 1 枚のまま使い、出力先だけを Phase1 / 楽天 / Yahoo で分ける実装です。Phase2 は実CSVに近い楽天/Yahoo itemsub を作りつつ、入力列は絞ったまま運用します。
 
 ## 今回の仕様
 - 入力シートは `中間入力` のみ
+- 楽天用の属性マスタとして `楽天商品属性テンプレート` シートを使います
 - 確認用は 3 系統
   - `確認用`
   - `楽天確認用`
@@ -16,13 +17,6 @@
   - `ir-item.csv`
   - `ir-itemsub_楽天.csv`
   - `ir-itemsub_Yahoo.csv`
-
-## 中間入力の考え方
-- 左 21 列は AI や元データをまとめて貼る欄です
-- 右 8 列は人が確認して決める欄です
-- 商品名や説明文は楽天用 / Yahoo用を別で持てます
-- 価格は `sale_price` の 1 列だけです
-- 画像は `1..image_count` のみ生成し、白背景画像は作りません
 
 ## 中間入力列
 1. `product_code`
@@ -47,36 +41,41 @@
 20. `yahoo_desc`
 21. `yahoo_sp_free`
 22. `rakuten_delivery_set_id`
-23. `rakuten_delivery_lead_time`
-24. `yahoo_shipping_group_id`
-25. `attribute_template_key`
-26. `note`
-27. `publish_phase1`
-28. `publish_rakuten`
-29. `publish_yahoo`
+23. `rakuten_display_price`
+24. `rakuten_double_price_text_mode`
+25. `yahoo_shipping_group_id`
+26. `attribute_template_key`
+27. `note`
+28. `publish_phase1`
+29. `publish_rakuten`
+30. `publish_yahoo`
 
-## 中間入力から外した列
-- 楽天
-  - `rakuten_display_category`
-  - `rakuten_sale_start`
-  - `rakuten_sale_end`
-  - `rakuten_shipping_code`
-  - `rakuten_stock_lead_time`
-  - `rakuten_stock_management_id`
-  - `rakuten_search_visible_flag`
-  - `rakuten_double_price_text`
-- Yahoo
-  - `yahoo_path`
-  - `yahoo_page_code`
-  - `yahoo_upload_target_flag`
-  - `yahoo_hidden_page_flag`
+## 楽天商品属性テンプレート
+シート名は `楽天商品属性テンプレート` です。列は次の 5 つです。
+
+1. `attribute_template_key`
+2. `sort_no`
+3. `rakuten_attr_name`
+4. `rakuten_attr_value`
+5. `rakuten_attr_unit`
+
+`中間入力.attribute_template_key` と一致する行を読み、`sort_no` 順に楽天 itemsub へ展開します。MVP では 20 セットまで出力します。
+
+## 楽天 itemsub の回収点
+- `楽天ジャンルID` を出力します
+- `rakuten_display_price` を `表示価格` に出力します
+  - 空欄なら `sale_price` を使います
+- `rakuten_double_price_text_mode` を `二重価格文言` に出力します
+  - 許可値は `0 / 1 / 2 / 空欄`
+- `attribute_template_key` から `商品属性（項目 / 値 / 単位）1..20` を出力します
+- `publish_rakuten = 1` かつ `rakuten_genre_id` がある行は、属性テンプレートから 1 件以上の属性が必要です
 
 ## CSV 出力時の吸収ルール
 - 楽天の `送料` は `rakuten_delivery_set_id` から導出します
   - `5 -> 1`
   - `2 -> 0`
-- 楽天の販売開始/終了、在庫切れ時納期、在庫管理、検索表示、二重価格文言は設定値または空欄で出します
-- Yahoo のパス、ページID、アップロード対象、ページ非公開は設定値または空欄で出します
+- 楽天の固定値は `Phase1Config.gs` の `mallSettings.rakuten.defaults`
+- Yahoo の固定値は `Phase1Config.gs` の `mallSettings.yahoo.defaults`
 
 ## publish フラグ
 - `publish_phase1 = 1` の行だけ `ir-item.csv` の対象
@@ -86,12 +85,13 @@
 ## 使い方
 1. `Phase1 > シートを初期化`
 2. `入力見本` と `使い方` を見ながら `中間入力` に入力
-3. 必要に応じて次を更新
+3. 楽天ジャンルIDを使う商品がある場合は `楽天商品属性テンプレート` に属性セットを入れる
+4. 必要に応じて次を更新
    - `Phase1の確認用を更新`
    - `楽天確認用を更新`
    - `Yahoo確認用を更新`
-4. エラー一覧を見て `中間入力` を修正
-5. 必要な CSV だけ書き出す
+5. エラー一覧を見て `中間入力` または `楽天商品属性テンプレート` を修正
+6. 必要な CSV だけ書き出す
 
 ## 実装ファイル
 - `Phase1Config.gs`
@@ -101,9 +101,3 @@
 - `Phase2RakutenPipeline.gs`
 - `Phase2YahooPipeline.gs`
 - `Phase1Tests.gs`
-
-## 仕様メモ
-- Phase1 は既存どおり `ir-item.csv` 用です
-- Phase2 は楽天 / Yahoo の `itemsub` を別ロジックで出します
-- バリエーションCSVはまだ未実装です
-- ショップ名や固定値は `Phase1Config.gs` で調整できます
