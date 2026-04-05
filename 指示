@@ -1,0 +1,87 @@
+あなたは Google Apps Script と item Robot CSV に強い実装担当です。
+このリポジトリ内の docs/ と samples/ を唯一の仕様源として、Phase1 のみを実装してください。
+
+【背景】
+最終的には item Robot の ir-item / itemsub / バリエーションCSV まで拡張したいです。
+ただし今回は Phase1 として、共通ベース商品を作る ir-item.csv の生成だけを対象にします。
+
+【今回の対象範囲】
+- ir-item.csv のみ
+- AI提案 → GAS整形 → 人確認 → ir-item.csv 出力
+- 中間CSV/確認用シート/エラー一覧の仕組みを作る
+- GASだけで最終CSVまで作り切る
+- item Robotから一度ダウンロードし直す前提にはしない
+
+【今回やらないこと】
+- 楽天 itemsub
+- Yahoo! itemsub
+- バリエーションCSV
+- オプション
+- モール別の高度な例外処理
+
+【実装要件】
+- 中間入力は1商品1行
+- 公式テンプレートのヘッダ順を崩さない
+- A/B/C列は必須として常に出力する
+- publish_flag = 1 の行だけ出力する
+- エラーがある行は出力しない
+- Shift_JIS / CRLF でCSV出力する
+- 画像URLはGASで自動生成する
+- 画像URLの固定部分は http://r-asp02.item-robot.com/upload/images/1681/
+- 画像URL形式は {product_code}/{file_name}.{ext}
+- 画像命名は 1.png / 2.png / 3.png / w.png
+- product_code と画像フォルダ名は一致させる
+
+【中間データで最低限持つ項目】
+- product_code_seed
+- product_code
+- raw_name
+- ai_title
+- final_title_override
+- category_id_final
+- price_suggested
+- sale_price
+- jan_code
+- warehouse_flag
+- tax_class
+- image_count
+- image_ext
+- has_white_image
+- ai_catchcopy
+- ai_description_material
+- attribute_template_key
+- note
+- publish_flag
+
+【GASでやること】
+- 商品コードの正規化
+- 商品名の確定
+- カテゴリ形式変換
+- 税区分の固定値補完
+- 表示価格の自動設定
+- 画像1〜20 URL生成
+- 在庫タイプの固定
+- 必須列チェック
+- エラー一覧作成
+- 確認用シート作成
+- ir-item.csv 出力
+
+【成果物】
+1. Phase1 の設計概要
+2. 中間CSVヘッダ一覧
+3. 中間CSV → ir-item.csv のマッピング表
+4. 固定値一覧
+5. バリデーション一覧
+6. GAS の関数構成
+7. 実装コード
+8. テストケース
+9. README
+
+【実装ルール】
+- まず docs/requirements_phase1.md と docs/current_decisions.md を読んでから作業する
+- 不足仕様は README に TODO として明記する
+- 勝手に itemsub / バリエーションを実装しない
+- 将来拡張しやすいようにコメントを残す
+- 日本語のシート名・列名を優先する
+- 既存ヘッダを勝手に省略しない
+- 最後に、どの仕様に従って実装したかを README に整理する

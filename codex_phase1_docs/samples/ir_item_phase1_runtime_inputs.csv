@@ -1,0 +1,14 @@
+﻿logical_name,current_header_or_group,need_level,recommended_owner,actual_pattern
+product_code,商品コード（楽天URL）,必須,GAS確定,画像フォルダ名も兼用。全行入力
+product_name,商品名,必須,AI提案→人確認/GAS整形,全行入力
+price,販売価格,必須,AI提案→GAS計算,全行入力
+category,カテゴリ,必須,GASマスタ変換,261/262行で使用
+rakuten_genre_id,楽天ジャンルID,必須,GASマスタ変換,全行入力
+jan,JANコード,推奨,元データ連携,140/262行で使用。ない商品あり
+desc_pc,PC用商品説明文,推奨,AI提案→GAS整形,101/262行で使用
+desc_sp,スマートフォン用商品説明文,推奨,AI提案→GAS整形,88/262行で使用
+image_count,画像1〜画像20,必須,GAS自動生成,平均7.0枚。画像URLは命名規則生成可
+attribute_values,商品属性（値）1〜,必須,カテゴリ別テンプレ差分入力,平均4.2個/商品
+tax_rate_flag,軽減税率,条件付き,GAS自動,"食品=1, その他=0"
+shipping_flag,送料,条件付き,GAS固定/商品別,254行が1
+warehouse_flag,倉庫指定,任意,GAS固定/商品別,253行が0
