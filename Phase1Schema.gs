@@ -5,7 +5,7 @@ const INPUT_BLOCKS = Object.freeze([
   Object.freeze({ from: 1, to: 12, title: '共通入力' }),
   Object.freeze({ from: 13, to: 17, title: '楽天入力' }),
   Object.freeze({ from: 18, to: 21, title: 'Yahoo入力' }),
-  Object.freeze({ from: 22, to: 41, title: '確認と出力設定' })
+  Object.freeze({ from: 22, to: 29, title: '確認と出力設定' })
 ]);
 
 const PHASE1_INPUT_SCHEMA = Object.freeze([
@@ -30,21 +30,9 @@ const PHASE1_INPUT_SCHEMA = Object.freeze([
   { key: 'yahoo_catchcopy', label: 'Yahooのキャッチコピー', required: false, note: 'Yahooだけ別の短い説明を使いたいときに入れます。空欄なら共通の短い説明を使います。', example: 'お菓子作りにも飲用にも使いやすい' },
   { key: 'yahoo_desc', label: 'Yahooの商品説明', required: false, note: 'Yahooの商品説明です。空欄なら共通の説明文の元を使います。', example: 'Yahoo用の商品説明です。HTMLも扱う想定です。' },
   { key: 'yahoo_sp_free', label: 'Yahooスマホ自由欄', required: false, note: 'Yahooのスマホ向け自由欄です。', example: 'スマホだけで見せたい補足情報を入れます。' },
-  { key: 'rakuten_display_category', label: '楽天のショップ内カテゴリ', required: false, note: '楽天の見せ方用カテゴリです。空欄なら共通カテゴリを使います。', example: '683|530' },
-  { key: 'rakuten_sale_start', label: '楽天の販売開始日時', required: false, note: '楽天の販売開始です。YYYYMMDDHHMM の 12 桁で入れます。', example: '202604051200' },
-  { key: 'rakuten_sale_end', label: '楽天の販売終了日時', required: false, note: '楽天の販売終了です。YYYYMMDDHHMM の 12 桁で入れます。', example: '202604302359' },
-  { key: 'rakuten_shipping_code', label: '楽天の送料設定', required: false, note: '0=送料別、1=送料込 です。空欄なら変更しません。', example: '0' },
-  { key: 'rakuten_delivery_set_id', label: '楽天の配送方法セット番号', required: false, note: '楽天の配送方法セット管理番号です。数字で入れます。', example: '1' },
-  { key: 'rakuten_delivery_lead_time', label: '楽天の在庫あり時納期番号', required: false, note: '楽天の在庫あり時納期管理番号です。数字で入れます。', example: '1' },
-  { key: 'rakuten_stock_lead_time', label: '楽天の在庫切れ時納期番号', required: false, note: '楽天の在庫切れ時納期管理番号です。数字で入れます。', example: '10' },
-  { key: 'rakuten_stock_management_id', label: '楽天の在庫管理番号', required: false, note: '楽天の在庫連動や管理番号に使う番号です。数字で入れます。', example: '1' },
-  { key: 'rakuten_search_visible_flag', label: '楽天の検索に出すか', required: false, note: '0=検索に出す、1=検索に出さない で使います。', example: '0' },
-  { key: 'rakuten_double_price_text', label: '楽天の二重価格文言', required: false, note: '0=自動、1=当店通常価格、2=メーカー希望小売価格 です。', example: '1' },
-  { key: 'yahoo_path', label: 'Yahooのパス', required: false, note: 'Yahooのカテゴリパスです。空欄なら共通カテゴリを使います。', example: '683|530' },
-  { key: 'yahoo_page_code', label: 'YahooのページID', required: false, note: 'YahooのページIDです。空欄なら商品コードを使います。', example: 'uji-matcha-200g' },
-  { key: 'yahoo_shipping_group_id', label: 'Yahooの配送グループ番号', required: false, note: 'Yahooの配送グループ管理番号です。数字で入れます。', example: '2' },
-  { key: 'yahoo_upload_target_flag', label: 'Yahooのアップロード対象', required: false, note: '0=対象外、1=対象 です。空欄なら 1 として扱います。', example: '1' },
-  { key: 'yahoo_hidden_page_flag', label: 'Yahooのページ非公開', required: false, note: '0=公開、1=非公開 です。', example: '0' },
+  { key: 'rakuten_delivery_set_id', label: '楽天の配送方法セット番号', required: false, note: '人が確認して入れる欄です。送料はここから自動で決まります。5なら送料込み、2なら送料別として出します。', example: '5' },
+  { key: 'rakuten_delivery_lead_time', label: '楽天の在庫あり時納期番号', required: false, note: '人が確認して入れる欄です。楽天の在庫あり時納期管理番号を入れます。', example: '1' },
+  { key: 'yahoo_shipping_group_id', label: 'Yahooの配送グループ番号', required: false, note: '人が確認して入れる欄です。Yahooの配送グループ管理番号を入れます。', example: '2' },
   { key: 'attribute_template_key', label: '属性テンプレート名', required: false, note: '今は自動展開しません。将来用のメモとして残します。', example: 'default' },
   { key: 'note', label: 'メモ', required: false, note: '社内メモです。CSVには出ません。', example: '初回出品分' },
   { key: 'publish_phase1', label: 'Phase1を出力するか', required: true, note: 'ir-item.csv に出したい行だけ 1 を入れます。', example: '1' },

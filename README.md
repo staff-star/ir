@@ -1,6 +1,6 @@
 # item Robot Phase1 / Phase2 GAS
 
-`中間入力` は 1 枚のまま使い、出力先だけを Phase1 / 楽天 / Yahoo で分ける実装です。
+`中間入力` は 1 枚のまま使い、出力先だけを Phase1 / 楽天 / Yahoo で分ける実装です。Phase2 は入力負荷を下げるため、人が入れる列を 29 列構成まで絞っています。
 
 ## 今回の仕様
 - 入力シートは `中間入力` のみ
@@ -19,7 +19,7 @@
 
 ## 中間入力の考え方
 - 左 21 列は AI や元データをまとめて貼る欄です
-- 右 20 列は人が確認して決める欄です
+- 右 8 列は人が確認して決める欄です
 - 商品名や説明文は楽天用 / Yahoo用を別で持てます
 - 価格は `sale_price` の 1 列だけです
 - 画像は `1..image_count` のみ生成し、白背景画像は作りません
@@ -46,26 +46,37 @@
 19. `yahoo_catchcopy`
 20. `yahoo_desc`
 21. `yahoo_sp_free`
-22. `rakuten_display_category`
-23. `rakuten_sale_start`
-24. `rakuten_sale_end`
-25. `rakuten_shipping_code`
-26. `rakuten_delivery_set_id`
-27. `rakuten_delivery_lead_time`
-28. `rakuten_stock_lead_time`
-29. `rakuten_stock_management_id`
-30. `rakuten_search_visible_flag`
-31. `rakuten_double_price_text`
-32. `yahoo_path`
-33. `yahoo_page_code`
-34. `yahoo_shipping_group_id`
-35. `yahoo_upload_target_flag`
-36. `yahoo_hidden_page_flag`
-37. `attribute_template_key`
-38. `note`
-39. `publish_phase1`
-40. `publish_rakuten`
-41. `publish_yahoo`
+22. `rakuten_delivery_set_id`
+23. `rakuten_delivery_lead_time`
+24. `yahoo_shipping_group_id`
+25. `attribute_template_key`
+26. `note`
+27. `publish_phase1`
+28. `publish_rakuten`
+29. `publish_yahoo`
+
+## 中間入力から外した列
+- 楽天
+  - `rakuten_display_category`
+  - `rakuten_sale_start`
+  - `rakuten_sale_end`
+  - `rakuten_shipping_code`
+  - `rakuten_stock_lead_time`
+  - `rakuten_stock_management_id`
+  - `rakuten_search_visible_flag`
+  - `rakuten_double_price_text`
+- Yahoo
+  - `yahoo_path`
+  - `yahoo_page_code`
+  - `yahoo_upload_target_flag`
+  - `yahoo_hidden_page_flag`
+
+## CSV 出力時の吸収ルール
+- 楽天の `送料` は `rakuten_delivery_set_id` から導出します
+  - `5 -> 1`
+  - `2 -> 0`
+- 楽天の販売開始/終了、在庫切れ時納期、在庫管理、検索表示、二重価格文言は設定値または空欄で出します
+- Yahoo のパス、ページID、アップロード対象、ページ非公開は設定値または空欄で出します
 
 ## publish フラグ
 - `publish_phase1 = 1` の行だけ `ir-item.csv` の対象

@@ -7,8 +7,9 @@ function runPhase1Tests() {
   assertEquals_('1480', resolveSalePrice_('1480', []), '販売価格');
   assertEquals_('1', resolveTaxRule_('1', []).reducedTaxRateFlag, 'food_flag=1');
   assertEquals_('10', resolveTaxRule_('0', []).taxRate, 'food_flag=0');
-  assertEquals_('|217199|', normalizeYahooPath_('', '217199', []), 'Yahooパス fallback');
-  assertEquals_('202604051200', normalizeRakutenSalePeriod_('202604051200', 'rakuten_sale_start', '開始', []), '楽天販売期間');
+  assertEquals_('1', deriveRakutenShippingCodeFromDeliverySet_('5'), '楽天配送セット 5');
+  assertEquals_('0', deriveRakutenShippingCodeFromDeliverySet_('2'), '楽天配送セット 2');
+  assertEquals_('', deriveRakutenShippingCodeFromDeliverySet_('9'), '楽天配送セット その他');
 
   const imageErrors = [];
   const images = buildImageBundle_('sample-code', '3', 'png', imageErrors);
@@ -57,20 +58,13 @@ function runPhase1Tests() {
     rakuten_pc_desc: '楽天PC説明',
     rakuten_sales_desc: '楽天販売説明',
     rakuten_sp_desc: '楽天スマホ説明',
-    rakuten_display_category: '683|530',
-    rakuten_sale_start: '202604051200',
-    rakuten_sale_end: '202604302359',
-    rakuten_shipping_code: '0',
-    rakuten_delivery_set_id: '1',
+    rakuten_delivery_set_id: '5',
     rakuten_delivery_lead_time: '1',
-    rakuten_stock_lead_time: '10',
-    rakuten_stock_management_id: '1',
-    rakuten_search_visible_flag: '0',
-    rakuten_double_price_text: '1',
     publish_rakuten: '1'
   }, 3);
   assertEquals_('楽天商品名', rakutenRecord.itemsubRow['商品名'], '楽天 itemsub 商品名');
-  assertEquals_('202604051200', rakutenRecord.itemsubRow['販売期間（開始）'], '楽天 itemsub 販売開始');
+  assertEquals_('1', rakutenRecord.itemsubRow['送料'], '楽天 itemsub 送料導出');
+  assertEquals_('', rakutenRecord.itemsubRow['販売期間（開始）'], '楽天 itemsub 販売開始固定');
   assertEquals_(0, rakutenRecord.errors.length, '楽天 record errors');
 
   const yahooRecord = buildYahooItemsubRecord_({
@@ -87,21 +81,19 @@ function runPhase1Tests() {
     yahoo_catchcopy: 'Yahooキャッチ',
     yahoo_desc: 'Yahoo説明',
     yahoo_sp_free: 'Yahooスマホ',
-    yahoo_path: '683|530',
-    yahoo_page_code: 'sample-product',
     yahoo_shipping_group_id: '2',
-    yahoo_upload_target_flag: '1',
-    yahoo_hidden_page_flag: '0',
     publish_yahoo: '1'
   }, 3);
   assertEquals_('Yahoo商品名', yahooRecord.itemsubRow['商品名'], 'Yahoo itemsub 商品名');
   assertEquals_('2', yahooRecord.itemsubRow['配送グループ管理番号'], 'Yahoo 配送グループ');
+  assertEquals_('', yahooRecord.itemsubRow['パス'], 'Yahoo パス固定');
+  assertEquals_('', yahooRecord.itemsubRow['商品コード'], 'Yahoo ページID固定');
   assertEquals_(0, yahooRecord.errors.length, 'Yahoo record errors');
 
   assertEquals_(393, IR_ITEM_HEADER.length, 'ir-item ヘッダ数');
   assertEquals_(28 + PHASE1_CONFIG.maxImageSlots, RAKUTEN_ITEMSUB_HEADER.length, '楽天 itemsub ヘッダ数');
   assertEquals_(19, YAHOO_ITEMSUB_HEADER.length, 'Yahoo itemsub ヘッダ数');
-  assertEquals_(41, PHASE1_INPUT_SCHEMA.length, '中間入力列数');
+  assertEquals_(29, PHASE1_INPUT_SCHEMA.length, '中間入力列数');
 
   SpreadsheetApp.getUi().alert('Phase1 / Phase2 のテストが完了しました。');
 }

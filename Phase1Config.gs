@@ -12,10 +12,25 @@ const PHASE1_CONFIG = Object.freeze({
   }),
   mallSettings: Object.freeze({
     rakuten: Object.freeze({
-      shopName: '楽天店'
+      shopName: '楽天店',
+      defaults: Object.freeze({
+        saleStart: '',
+        saleEnd: '',
+        stockLeadTime: '',
+        outOfStockLeadTime: '',
+        stockManagementId: '',
+        searchVisibleFlag: '',
+        doublePriceText: ''
+      })
     }),
     yahoo: Object.freeze({
-      shopName: 'Yahoo店'
+      shopName: 'Yahoo店',
+      defaults: Object.freeze({
+        path: '',
+        pageCode: '',
+        uploadTargetFlag: '',
+        hiddenPageFlag: ''
+      })
     })
   }),
   imageBaseUrl: 'http://r-asp02.item-robot.com/upload/images/1681/',

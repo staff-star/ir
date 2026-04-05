@@ -311,7 +311,7 @@ function buildSampleSheetRows_() {
   return [
     Object.assign(blankRow.slice(), { 0: '入力見本' }),
     Object.assign(blankRow.slice(), { 0: 'このシートの使い方', 1: '5行目が見出し、6行目が説明、7行目以降が実際の入力例です。実務では「中間入力」シートの3行目から入力します。' }),
-    Object.assign(blankRow.slice(), { 0: '見方のコツ', 1: '青い欄はAIや元データをまとめて貼る欄、黄色い欄は人が確認する欄です。最後の3列で Phase1 / 楽天 / Yahoo の出力先を切り分けます。' }),
+    Object.assign(blankRow.slice(), { 0: '見方のコツ', 1: '青い欄はAIや元データをまとめて貼る欄、黄色い欄は人が確認する欄です。人が入れる欄は少なくしてあり、最後の3列で Phase1 / 楽天 / Yahoo の出力先を切り分けます。' }),
     blankRow.slice(),
     sampleHeader,
     sampleNotes,
@@ -337,21 +337,9 @@ function buildSampleSheetRows_() {
       yahoo_catchcopy: 'お菓子作りにも飲用にも使いやすい',
       yahoo_desc: 'Yahoo用の商品説明です。HTMLも扱う想定です。',
       yahoo_sp_free: 'スマホだけで見せたい補足情報を入れます。',
-      rakuten_display_category: '683|530',
-      rakuten_sale_start: '202604051200',
-      rakuten_sale_end: '202604302359',
-      rakuten_shipping_code: '0',
       rakuten_delivery_set_id: '1',
       rakuten_delivery_lead_time: '1',
-      rakuten_stock_lead_time: '10',
-      rakuten_stock_management_id: '1',
-      rakuten_search_visible_flag: '0',
-      rakuten_double_price_text: '1',
-      yahoo_path: '683|530',
-      yahoo_page_code: 'uji-matcha-200g',
       yahoo_shipping_group_id: '2',
-      yahoo_upload_target_flag: '1',
-      yahoo_hidden_page_flag: '0',
       attribute_template_key: 'default',
       note: '初回出品分',
       publish_phase1: '1',
@@ -375,12 +363,6 @@ function buildSampleSheetRows_() {
       yahoo_title: 'ほうじ茶 ティーバッグ 20包',
       yahoo_desc: 'Yahoo用の説明は短めにまとめています。',
       yahoo_sp_free: 'スマホ向けの補足だけを入れます。',
-      rakuten_display_category: '217199',
-      rakuten_shipping_code: '0',
-      yahoo_path: '217199',
-      yahoo_page_code: 'teabag-houjicha-20p',
-      yahoo_upload_target_flag: '1',
-      yahoo_hidden_page_flag: '0',
       attribute_template_key: 'default',
       note: 'Yahooは後日開始',
       publish_phase1: '1',
@@ -423,7 +405,7 @@ function populateGuideSheet_(sheet) {
   setMergedValue_(
     sheet,
     'A3:J4',
-    '入力は「中間入力」1枚でまとめて行い、その後に Phase1、楽天、Yahoo の確認用シートへ分かれます。出したい先だけ最後の3列を 1 にして、必要なCSVだけ作成します。'
+    '入力は「中間入力」1枚でまとめて行い、その後に Phase1、楽天、Yahoo の確認用シートへ分かれます。人が入れる欄は必要最小限にし、出したい先だけ最後の3列を 1 にして、必要なCSVだけ作成します。'
   );
 
   setMergedValue_(sheet, 'A6:C8', '1. データ入力\n共通の中間入力へ入れる');
@@ -436,7 +418,7 @@ function populateGuideSheet_(sheet) {
   setMergedValue_(
     sheet,
     'A12:D27',
-    '青い欄はAIや元データを一気に貼る欄です。黄色い欄は人が確認して決める欄です。\n\n列のまとまりは次の4つです。\n・共通入力: 商品コード、共通商品名、価格、JAN、画像枚数など\n・楽天入力: 楽天用の商品名、説明文、販売説明文など\n・Yahoo入力: Yahoo用の商品名、説明文、スマホ自由欄など\n・確認と出力設定: 販売期間、配送番号、公開設定、publishフラグなど\n\n最後の3列は出力先のスイッチです。\n・publish_phase1 = ir-item.csv\n・publish_rakuten = ir-itemsub_楽天.csv\n・publish_yahoo = ir-itemsub_Yahoo.csv\n\n1行に1商品ずつ入れます。画像は白背景画像なしで、1 から image_count の枚数だけ自動生成します。'
+    '青い欄はAIや元データを一気に貼る欄です。黄色い欄は人が確認して決める欄です。\n\n列のまとまりは次の4つです。\n・共通入力: 商品コード、共通商品名、価格、JAN、画像枚数など\n・楽天入力: 楽天用の商品名、説明文、販売説明文など\n・Yahoo入力: Yahoo用の商品名、説明文、スマホ自由欄など\n・確認と出力設定: 楽天の配送方法セット番号、楽天の納期番号、Yahooの配送グループ番号、publishフラグなど\n\n最後の3列は出力先のスイッチです。\n・publish_phase1 = ir-item.csv\n・publish_rakuten = ir-itemsub_楽天.csv\n・publish_yahoo = ir-itemsub_Yahoo.csv\n\n楽天の送料は「配送方法セット番号」から自動で決まります。5 なら送料込み、2 なら送料別です。YahooのパスやページIDはこの段階では入力しません。\n\n1行に1商品ずつ入れます。画像は白背景画像なしで、1 から image_count の枚数だけ自動生成します。'
   );
   setMergedValue_(sheet, 'E12:J12', '画面イメージ: 入力見本');
   sheet.getRange('E13').setFormula("=ARRAY_CONSTRAIN('入力見本'!A5:F8,4,6)");
